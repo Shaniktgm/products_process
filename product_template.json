@@ -1,0 +1,252 @@
+{
+  "product_template": {
+    "description": "Complete template for adding new products to the multi-platform database. Includes all related tables.",
+    "required_fields": [
+      "sku",
+      "title", 
+      "price",
+      "rating",
+      "review_count"
+    ],
+    "main_product_data": {
+      "sku": "UNIQUE-SKU-001",
+      "title": "Product Title Here",
+      "brand": "Brand Name",
+      "description": "Full product description with features, benefits, and details",
+      "short_description": "Brief one-line description",
+      "slug": "product-title-url-friendly",
+      "price": 99.99,
+      "original_price": 119.99,
+      "discount_percentage": 17,
+      "currency": "USD",
+      "rating": 4.5,
+      "review_count": 1250,
+      "primary_image_url": "https://example.com/main-image.jpg",
+      "image_urls": "[\"https://example.com/image1.jpg\", \"https://example.com/image2.jpg\", \"https://example.com/image3.jpg\"]",
+      "video_urls": "[]",
+      "availability": "In Stock",
+      "stock_status": "Available",
+      "stock_quantity": 50,
+      "condition": "New",
+      "warranty": "1-year manufacturer warranty",
+      "return_policy": "30-day return policy",
+      "shipping_info": "Free shipping on orders over $50",
+      "age_recommendation": "All ages",
+      "ingredients": "100% Cotton",
+      "weight": 2.5,
+      "dimensions": "{\"length\": 102, \"width\": 90, \"height\": 2}",
+      "color": "White",
+      "material": "Cotton",
+      "size": "Queen",
+      "meta_title": "Product Title - Brand Name | Best Bed Sheets",
+      "meta_description": "Shop Product Title by Brand Name. Brief description for SEO",
+      "tags": "[\"bed-sheets\", \"home-garden\", \"cotton\", \"queen-size\"]",
+      "deal_badges": "[\"Best Seller\", \"Limited Time\"]",
+      "is_active": true,
+      "is_featured": false,
+      "is_bestseller": true,
+      "overall_value_score": 8.5
+    },
+    "platform_data": {
+      "description": "Platform-specific data for where this product is sold",
+      "platforms": [
+        {
+          "platform_name": "amazon",
+          "platform_sku": "B08XYZ123",
+          "platform_url": "https://amazon.com/dp/B08XYZ123",
+          "platform_price": 99.99,
+          "platform_availability": "In Stock",
+          "platform_rating": 4.5,
+          "platform_review_count": 1250,
+          "platform_specific_data": "{\"ASIN\": \"B08XYZ123\", \"Prime\": true}",
+          "is_primary": true
+        },
+        {
+          "platform_name": "d2c",
+          "platform_sku": "D2C-001",
+          "platform_url": "https://brandwebsite.com/product",
+          "platform_price": 89.99,
+          "platform_availability": "In Stock",
+          "platform_rating": 4.3,
+          "platform_review_count": 450,
+          "platform_specific_data": "{\"discount_code\": \"SAVE10\"}",
+          "is_primary": false
+        }
+      ]
+    },
+    "affiliate_links": {
+      "description": "Affiliate links for different platforms and devices",
+      "links": [
+        {
+          "platform_name": "amazon",
+          "link_type": "web",
+          "affiliate_url": "https://amazon.com/dp/B08XYZ123?tag=yourtag-20",
+          "commission_rate": 0.04,
+          "estimated_commission": 4.00,
+          "is_active": true
+        },
+        {
+          "platform_name": "amazon",
+          "link_type": "mobile",
+          "affiliate_url": "https://amazon.com/dp/B08XYZ123?tag=yourtag-20&linkCode=ur2",
+          "commission_rate": 0.04,
+          "estimated_commission": 4.00,
+          "is_active": true
+        }
+      ]
+    },
+    "product_features": {
+      "description": "Product features, pros, cons, and specifications",
+      "features": [
+        {
+          "feature_text": "100% Cotton Material",
+          "feature_type": "pro",
+          "display_order": 1
+        },
+        {
+          "feature_text": "800 Thread Count",
+          "feature_type": "specification",
+          "display_order": 2
+        },
+        {
+          "feature_text": "Machine Washable",
+          "feature_type": "pro",
+          "display_order": 3
+        },
+        {
+          "feature_text": "May shrink slightly on first wash",
+          "feature_type": "con",
+          "display_order": 4
+        }
+      ]
+    },
+    "product_specifications": {
+      "description": "Technical specifications and measurements",
+      "specifications": [
+        {
+          "spec_name": "Thread Count",
+          "spec_value": "800",
+          "spec_unit": "threads per square inch",
+          "display_order": 1
+        },
+        {
+          "spec_name": "Material",
+          "spec_value": "100% Cotton",
+          "spec_unit": null,
+          "display_order": 2
+        },
+        {
+          "spec_name": "Weight",
+          "spec_value": "2.5",
+          "spec_unit": "lbs",
+          "display_order": 3
+        },
+        {
+          "spec_name": "Dimensions",
+          "spec_value": "102 x 90",
+          "spec_unit": "inches",
+          "display_order": 4
+        }
+      ]
+    },
+    "product_categories": {
+      "description": "Product categorization and hierarchy",
+      "categories": [
+        {
+          "category_name": "Bed Sheets",
+          "category_path": "Home & Garden > Bedding > Bed Sheets",
+          "is_primary": true,
+          "display_order": 1
+        },
+        {
+          "category_name": "Cotton Sheets",
+          "category_path": "Home & Garden > Bedding > Bed Sheets > Cotton Sheets",
+          "is_primary": false,
+          "display_order": 2
+        },
+        {
+          "category_name": "Queen Size",
+          "category_path": "Home & Garden > Bedding > Bed Sheets > Queen Size",
+          "is_primary": false,
+          "display_order": 3
+        }
+      ]
+    }
+  },
+  "example_product": {
+    "description": "Example based on existing product: 100% Cotton Sateen Buttery Soft 800 Thread Count",
+    "product_data": {
+      "sku": "FILTERED-001",
+      "title": "100% Cotton Sateen Buttery Soft 800 Thread Count",
+      "brand": "california-design-den",
+      "description": "Beats Fake Egyptian Claim Luxury 100% Cotton Sheets",
+      "short_description": "Premium 100% cotton sateen buttery soft 800 thread count",
+      "slug": "100-cotton-sateen-buttery-soft-800-thread-count",
+      "price": 98.0,
+      "original_price": 117.6,
+      "discount_percentage": 16,
+      "currency": "USD",
+      "rating": 4.4,
+      "review_count": 748,
+      "primary_image_url": "/images/products/1.jpg",
+      "image_urls": "[\"https://oqc9lt7zlwlkp8e3.public.blob.vercel-storage.com/676ae9536d4fa8c3684f3c0c_61+PQumJMTL._AC_SL1500_.jpg\", \"https://oqc9lt7zlwlkp8e3.public.blob.vercel-storage.com/676ae9593ec6faec76a938f4_81oK2vKNWPL._AC_SL1500_.jpg\", \"https://oqc9lt7zlwlkp8e3.public.blob.vercel-storage.com/676ae9600cd1d3c0d1ab0fd3_81vol+V3kpL._AC_SL1500_.jpg\", \"https://oqc9lt7zlwlkp8e3.public.blob.vercel-storage.com/676ae9666415aa5657193270_71gxldSM7MS._AC_SL1500_.jpg\", \"https://oqc9lt7zlwlkp8e3.public.blob.vercel-storage.com/676ae96d630487c2907ddce4_818sBFizSSS._AC_SL1500_.jpg\"]",
+      "video_urls": "[]",
+      "availability": "In Stock",
+      "stock_status": "Available",
+      "stock_quantity": 100,
+      "condition": "New",
+      "warranty": "30-day return policy",
+      "return_policy": "30-day return policy",
+      "shipping_info": "Free shipping on orders over $50",
+      "age_recommendation": "All ages",
+      "ingredients": "Cotton",
+      "weight": 2.0,
+      "dimensions": "{\"length\": 102, \"width\": 90, \"height\": 2}",
+      "color": "White",
+      "material": "Cotton",
+      "size": "Queen",
+      "meta_title": "100% Cotton Sateen Buttery Soft 800 Thread Count - california-design-den",
+      "meta_description": "Premium Bed Sheets",
+      "tags": "[\"bed-sheets\", \"home-garden\", \"best-on-amazon\", \"percale\", \"queen-size-on-amazon\", \"cotton\", \"queen-size\"]",
+      "deal_badges": "[\"Best Seller\"]",
+      "is_active": true,
+      "is_featured": true,
+      "is_bestseller": true,
+      "overall_value_score": 8.0
+    }
+  },
+  "instructions": {
+    "how_to_use": [
+      "1. Copy the complete product_template section",
+      "2. Fill in main_product_data required fields (sku, title, price, rating, review_count)",
+      "3. Fill in platform_data for each platform where the product is sold",
+      "4. Add affiliate_links for each platform and device type",
+      "5. List product_features (pros, cons, specifications)",
+      "6. Add product_specifications with technical details",
+      "7. Define product_categories for proper organization",
+      "8. For JSON fields, use proper JSON format",
+      "9. overall_value_score will be calculated automatically if not provided",
+      "10. Use the example_product as a reference for formatting"
+    ],
+    "field_descriptions": {
+      "main_product_data": "Core product information (products table)",
+      "platform_data": "Platform-specific data (product_platforms table)",
+      "affiliate_links": "Affiliate links for monetization (affiliate_links table)",
+      "product_features": "Features, pros, cons (product_features table)",
+      "product_specifications": "Technical specs (product_specifications table)",
+      "product_categories": "Categorization (product_categories table)",
+      "platform_name": "Use: amazon, d2c, walmart, target, etsy, shopify, other",
+      "feature_type": "Use: pro, con, specification, general",
+      "link_type": "Use: web, mobile, desktop",
+      "overall_value_score": "Value for money score 1-10 (optional - will be calculated)"
+    },
+    "database_tables_covered": [
+      "products (main product data)",
+      "product_platforms (platform-specific data)",
+      "affiliate_links (monetization links)",
+      "product_features (features and specifications)",
+      "product_specifications (technical details)",
+      "product_categories (categorization)"
+    ]
+  }
+}

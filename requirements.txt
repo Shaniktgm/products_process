@@ -1,0 +1,3 @@
+# Simple Amazon API implementation using requests
+python-dotenv==1.0.0
+requests==2.31.0

@@ -1,0 +1,154 @@
+{
+  "scoring_system": {
+    "version": "1.0",
+    "description": "Configuration for product scoring system",
+    "last_updated": "2025-01-03"
+  },
+  "overall_score": {
+    "method": "overall_value_score",
+    "description": "Use only overall_value_score for product scoring",
+    "formula": "overall_value_score",
+    "options": {
+      "overall_value_score": {
+        "description": "Use overall_value_score as the main score (value for money)",
+        "formula": "overall_value_score",
+        "min_score": 1,
+        "max_score": 10
+      }
+    }
+  },
+  "sub_scores": {
+    "total_score": {
+      "description": "Overall product quality score",
+      "source": "csv_data",
+      "fallback_method": "rating_based",
+      "fallback_formula": "rating * 2",
+      "min_value": 1,
+      "max_value": 10
+    },
+    "popularity_score": {
+      "description": "Product popularity based on review count",
+      "source": "csv_data",
+      "fallback_method": "review_count_based",
+      "fallback_formula": "min(9, 5 + (review_count / 1000))",
+      "min_value": 1,
+      "max_value": 10,
+      "thresholds": {
+        "very_popular": 5000,
+        "popular": 2000,
+        "moderate": 1000,
+        "low": 500
+      }
+    },
+    "brand_reputation_score": {
+      "description": "Brand trust and reputation score",
+      "source": "csv_data",
+      "fallback_method": "rating_based",
+      "fallback_formula": "rating >= 4.5 ? 9 : rating >= 4.0 ? 7 : rating >= 3.5 ? 5 : 3",
+      "min_value": 1,
+      "max_value": 10
+    },
+    "overall_value_score": {
+      "description": "Value for money assessment",
+      "source": "csv_data",
+      "fallback_method": "price_rating_ratio",
+      "fallback_formula": "rating >= 4.0 && price < 100 ? 9 : rating >= 4.0 && price < 150 ? 8 : rating >= 3.5 && price < 200 ? 7 : 6",
+      "min_value": 1,
+      "max_value": 10
+    },
+    "luxury_score": {
+      "description": "Luxury and premium level score",
+      "source": "csv_data",
+      "fallback_method": "price_based",
+      "fallback_formula": "price > 250 ? 9 : price > 150 ? 7 : price > 100 ? 5 : 3",
+      "min_value": 1,
+      "max_value": 10,
+      "price_thresholds": {
+        "ultra_luxury": 250,
+        "luxury": 150,
+        "premium": 100,
+        "standard": 50
+      }
+    }
+  },
+  "scoring_weights": {
+    "description": "Weights for composite scoring methods",
+    "total_score": 0.3,
+    "popularity_score": 0.2,
+    "brand_reputation_score": 0.2,
+    "overall_value_score": 0.2,
+    "luxury_score": 0.1
+  },
+  "price_categories": {
+    "description": "Price ranges for different product tiers",
+    "budget": {
+      "max_price": 50,
+      "luxury_multiplier": 0.5
+    },
+    "mid_range": {
+      "min_price": 50,
+      "max_price": 150,
+      "luxury_multiplier": 1.0
+    },
+    "premium": {
+      "min_price": 150,
+      "max_price": 250,
+      "luxury_multiplier": 1.5
+    },
+    "luxury": {
+      "min_price": 250,
+      "luxury_multiplier": 2.0
+    }
+  },
+  "rating_thresholds": {
+    "description": "Rating thresholds for different score levels",
+    "excellent": 4.5,
+    "very_good": 4.0,
+    "good": 3.5,
+    "average": 3.0,
+    "poor": 2.5
+  },
+  "review_count_thresholds": {
+    "description": "Review count thresholds for popularity scoring",
+    "very_high": 5000,
+    "high": 2000,
+    "moderate": 1000,
+    "low": 500,
+    "very_low": 100
+  },
+  "material_bonuses": {
+    "description": "Bonus scores for premium materials",
+    "egyptian_cotton": 1.0,
+    "bamboo": 0.8,
+    "linen": 0.9,
+    "silk": 1.2,
+    "tencel": 0.7,
+    "eucalyptus": 0.6
+  },
+  "thread_count_bonuses": {
+    "description": "Bonus scores for high thread counts",
+    "1000_plus": 1.0,
+    "800_999": 0.8,
+    "600_799": 0.6,
+    "400_599": 0.4,
+    "below_400": 0.2
+  },
+  "scoring_methods": {
+    "description": "Available scoring calculation methods",
+    "methods": [
+      "price_based",
+      "weighted_composite",
+      "value_focused",
+      "luxury_premium",
+      "rating_focused",
+      "popularity_focused"
+    ]
+  },
+  "update_settings": {
+    "description": "Settings for updating scores",
+    "auto_update": true,
+    "update_frequency": "daily",
+    "backup_before_update": true,
+    "log_changes": true
+  }
+}
