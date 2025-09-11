@@ -97,6 +97,7 @@ class MultiPlatformDatabaseService:
                         -- SEO & Marketing
                         meta_title TEXT,
                         meta_description TEXT,
+                        product_summary TEXT,  -- One-sentence product summary
                         tags TEXT,  -- JSON array
                         deal_badges TEXT,  -- JSON array
                         
@@ -189,6 +190,26 @@ class MultiPlatformDatabaseService:
                     )
                 ''')
                 
+                # Create product_images table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS product_images (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        product_id INTEGER NOT NULL,
+                        original_url TEXT NOT NULL,  -- Original image URL from web
+                        local_path TEXT,  -- Local file path (e.g., "1_1.webp")
+                        vercel_url TEXT,  -- Vercel CDN URL after manual upload
+                        is_primary BOOLEAN DEFAULT FALSE,  -- Primary image flag
+                        display_order INTEGER DEFAULT 0,  -- Order of images (1, 2, 3, etc.)
+                        image_type TEXT,  -- 'webp', 'jpg', 'png', etc.
+                        file_size INTEGER,  -- File size in bytes
+                        width INTEGER,  -- Image width in pixels
+                        height INTEGER,  -- Image height in pixels
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+                    )
+                ''')
+                
                 # Create product_reviews table (aggregated reviews)
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS product_reviews (
@@ -218,6 +239,8 @@ class MultiPlatformDatabaseService:
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_product_platforms_platform ON product_platforms (platform_id)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_affiliate_links_product ON affiliate_links (product_id)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_affiliate_links_platform ON affiliate_links (platform_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images (product_id)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_product_images_primary ON product_images (product_id, is_primary)')
                 
                 # Insert default platforms
                 self._insert_default_platforms(cursor)
@@ -280,9 +303,9 @@ class MultiPlatformDatabaseService:
                         condition, warranty, return_policy, shipping_info,
                         age_recommendation, ingredients,
                         weight, dimensions, color, material, size,
-                        meta_title, meta_description, tags, deal_badges,
+                        meta_title, meta_description, product_summary, tags, deal_badges,
                         is_active, is_featured, is_bestseller
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     product_data['sku'],
                     product_data.get('title'),
@@ -315,6 +338,7 @@ class MultiPlatformDatabaseService:
                     product_data.get('size'),
                     product_data.get('meta_title'),
                     product_data.get('meta_description'),
+                    product_data.get('product_summary'),
                     json.dumps(product_data.get('tags', [])),
                     json.dumps(product_data.get('deal_badges', [])),
                     product_data.get('is_active', True),
@@ -365,6 +389,11 @@ class MultiPlatformDatabaseService:
                             INSERT INTO product_specifications (product_id, spec_name, spec_value, display_order)
                             VALUES (?, ?, ?, ?)
                         ''', (product_id, spec_name, spec_value, i))
+                
+                # Insert images
+                if product_data.get('images'):
+                    for image_data in product_data['images']:
+                        self._insert_product_image(cursor, product_id, image_data)
                 
                 conn.commit()
                 print(f"✅ Inserted product: {product_data.get('title', 'Unknown')}")
@@ -457,6 +486,9 @@ class MultiPlatformDatabaseService:
                     # Get specifications
                     product['specifications'] = self._get_product_specifications(cursor, product_id)
                     
+                    # Get images
+                    product['images'] = self._get_product_images(cursor, product_id)
+                    
                     # Parse JSON fields
                     product['image_urls'] = json.loads(product.get('image_urls', '[]'))
                     product['video_urls'] = json.loads(product.get('video_urls', '[]'))
@@ -532,6 +564,38 @@ class MultiPlatformDatabaseService:
         ''', (product_id,))
         
         return [dict(row) for row in cursor.fetchall()]
+    
+    def _get_product_images(self, cursor, product_id: int) -> List[Dict[str, Any]]:
+        """Get images for a product"""
+        cursor.execute('''
+            SELECT original_url, local_path, vercel_url, is_primary, 
+                   display_order, image_type, file_size, width, height
+            FROM product_images
+            WHERE product_id = ?
+            ORDER BY display_order
+        ''', (product_id,))
+        
+        return [dict(row) for row in cursor.fetchall()]
+    
+    def _insert_product_image(self, cursor, product_id: int, image_data: Dict[str, Any]):
+        """Insert product image data"""
+        cursor.execute('''
+            INSERT INTO product_images (
+                product_id, original_url, local_path, vercel_url,
+                is_primary, display_order, image_type, file_size, width, height
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            product_id,
+            image_data['original_url'],
+            image_data.get('local_path'),
+            image_data.get('vercel_url'),
+            image_data.get('is_primary', False),
+            image_data.get('display_order', 0),
+            image_data.get('image_type'),
+            image_data.get('file_size'),
+            image_data.get('width'),
+            image_data.get('height')
+        ))
     
     def get_database_stats(self) -> Dict[str, Any]:
         """Get comprehensive database statistics"""

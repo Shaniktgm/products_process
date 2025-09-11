@@ -7,6 +7,11 @@
 images/
 downloaded_images/
 
+# Test files
+test_*.csv
+test_*.json
+*_test.py
+
 # Environment files
 .env
 .env.local

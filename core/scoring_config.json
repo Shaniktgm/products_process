@@ -5,34 +5,27 @@
     "last_updated": "2025-01-03"
   },
   "overall_score": {
-    "method": "overall_value_score",
-    "description": "Use only overall_value_score for product scoring",
-    "formula": "overall_value_score",
+    "method": "comprehensive_composite",
+    "description": "Comprehensive score based on popularity, brand reputation, price, and commission",
+    "formula": "comprehensive_composite",
     "options": {
-      "overall_value_score": {
-        "description": "Use overall_value_score as the main score (value for money)",
-        "formula": "overall_value_score",
-        "min_score": 1,
-        "max_score": 10
+      "comprehensive_composite": {
+        "description": "Weighted combination of popularity, brand reputation, price value, and commission",
+        "formula": "popularity_score * 0.3 + brand_reputation_score * 0.3 + price_value_score * 0.2 + commission_score * 0.2",
+        "min_score": 2,
+        "max_score": 5,
+        "default_commission_rate": 0.10
       }
     }
   },
   "sub_scores": {
-    "total_score": {
-      "description": "Overall product quality score",
-      "source": "csv_data",
-      "fallback_method": "rating_based",
-      "fallback_formula": "rating * 2",
-      "min_value": 1,
-      "max_value": 10
-    },
     "popularity_score": {
       "description": "Product popularity based on review count",
       "source": "csv_data",
       "fallback_method": "review_count_based",
-      "fallback_formula": "min(9, 5 + (review_count / 1000))",
-      "min_value": 1,
-      "max_value": 10,
+      "fallback_formula": "min(5, 2 + (review_count / 1000))",
+      "min_value": 2,
+      "max_value": 5,
       "thresholds": {
         "very_popular": 5000,
         "popular": 2000,
@@ -44,40 +37,34 @@
       "description": "Brand trust and reputation score",
       "source": "csv_data",
       "fallback_method": "rating_based",
-      "fallback_formula": "rating >= 4.5 ? 9 : rating >= 4.0 ? 7 : rating >= 3.5 ? 5 : 3",
-      "min_value": 1,
-      "max_value": 10
+      "fallback_formula": "rating >= 4.5 ? 5 : rating >= 4.0 ? 4.5 : rating >= 3.5 ? 3.5 : 2.5",
+      "min_value": 2,
+      "max_value": 5
     },
-    "overall_value_score": {
-      "description": "Value for money assessment",
+    "price_value_score": {
+      "description": "Price value assessment based on price and rating",
       "source": "csv_data",
       "fallback_method": "price_rating_ratio",
-      "fallback_formula": "rating >= 4.0 && price < 100 ? 9 : rating >= 4.0 && price < 150 ? 8 : rating >= 3.5 && price < 200 ? 7 : 6",
-      "min_value": 1,
-      "max_value": 10
+      "fallback_formula": "rating >= 4.0 && price < 100 ? 5 : rating >= 4.0 && price < 150 ? 4.5 : rating >= 3.5 && price < 200 ? 4 : 3",
+      "min_value": 2,
+      "max_value": 5
     },
-    "luxury_score": {
-      "description": "Luxury and premium level score",
+    "commission_score": {
+      "description": "Commission value score based on commission rate and price",
       "source": "csv_data",
-      "fallback_method": "price_based",
-      "fallback_formula": "price > 250 ? 9 : price > 150 ? 7 : price > 100 ? 5 : 3",
-      "min_value": 1,
-      "max_value": 10,
-      "price_thresholds": {
-        "ultra_luxury": 250,
-        "luxury": 150,
-        "premium": 100,
-        "standard": 50
-      }
+      "fallback_method": "commission_based",
+      "fallback_formula": "commission_rate >= 0.15 ? 5 : commission_rate >= 0.10 ? 4.5 : commission_rate >= 0.05 ? 4 : 3",
+      "min_value": 2,
+      "max_value": 5,
+      "default_commission_rate": 0.10
     }
   },
   "scoring_weights": {
-    "description": "Weights for composite scoring methods",
-    "total_score": 0.3,
-    "popularity_score": 0.2,
-    "brand_reputation_score": 0.2,
-    "overall_value_score": 0.2,
-    "luxury_score": 0.1
+    "description": "Weights for comprehensive composite scoring method",
+    "popularity_score": 0.3,
+    "brand_reputation_score": 0.3,
+    "price_value_score": 0.2,
+    "commission_score": 0.2
   },
   "price_categories": {
     "description": "Price ranges for different product tiers",
@@ -117,21 +104,21 @@
     "very_low": 100
   },
   "material_bonuses": {
-    "description": "Bonus scores for premium materials",
-    "egyptian_cotton": 1.0,
-    "bamboo": 0.8,
-    "linen": 0.9,
-    "silk": 1.2,
-    "tencel": 0.7,
-    "eucalyptus": 0.6
+    "description": "Bonus scores for premium materials (2-5 range)",
+    "egyptian_cotton": 0.5,
+    "bamboo": 0.4,
+    "linen": 0.4,
+    "silk": 0.6,
+    "tencel": 0.3,
+    "eucalyptus": 0.3
   },
   "thread_count_bonuses": {
-    "description": "Bonus scores for high thread counts",
-    "1000_plus": 1.0,
-    "800_999": 0.8,
-    "600_799": 0.6,
-    "400_599": 0.4,
-    "below_400": 0.2
+    "description": "Bonus scores for high thread counts (2-5 range)",
+    "1000_plus": 0.5,
+    "800_999": 0.4,
+    "600_799": 0.3,
+    "400_599": 0.2,
+    "below_400": 0.1
   },
   "scoring_methods": {
     "description": "Available scoring calculation methods",

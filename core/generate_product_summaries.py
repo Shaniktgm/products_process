@@ -1,0 +1,488 @@
+#!/usr/bin/env python3
+"""
+Product Summary Generator
+Generates one-sentence summaries for products based on their features, pros, cons, and specifications
+"""
+
+import sqlite3
+import json
+import re
+from typing import List, Dict, Any, Optional
+from pathlib import Path
+
+class ProductSummaryGenerator:
+    """Generate concise one-sentence product summaries"""
+    
+    def __init__(self, db_path: str = "multi_platform_products.db"):
+        self.db_path = db_path
+        
+        # Keywords for different aspects
+        self.quality_keywords = [
+            'premium', 'luxury', 'high-quality', 'durable', 'long-lasting', 
+            'soft', 'smooth', 'comfortable', 'breathable', 'moisture-wicking'
+        ]
+        
+        self.material_keywords = [
+            'cotton', 'bamboo', 'linen', 'silk', 'polyester', 'microfiber',
+            'egyptian cotton', 'organic cotton', 'tencel', 'eucalyptus'
+        ]
+        
+        self.feature_keywords = [
+            'wrinkle-free', 'easy care', 'machine washable', 'cooling', 
+            'temperature regulating', 'hypoallergenic', 'anti-microbial',
+            'stain resistant', 'fade resistant', 'shrink resistant'
+        ]
+        
+        self.concern_keywords = [
+            'warm sleepers', 'hot sleepers', 'cold sleepers', 'sensitive skin',
+            'allergies', 'wrinkles', 'shrinkage', 'fading', 'pilling'
+        ]
+        
+        self.thread_count_keywords = [
+            'thread count', 'tc', 'threads per inch', 'tpi'
+        ]
+    
+    def get_product_data(self, product_id: int) -> Optional[Dict[str, Any]]:
+        """Get comprehensive product data for summary generation"""
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                # Get main product data
+                cursor.execute('''
+                    SELECT * FROM products WHERE id = ?
+                ''', (product_id,))
+                
+                product_row = cursor.fetchone()
+                if not product_row:
+                    return None
+                
+                product = dict(product_row)
+                
+                # Get features (pros/cons)
+                cursor.execute('''
+                    SELECT feature_text, feature_type, display_order
+                    FROM product_features
+                    WHERE product_id = ?
+                    ORDER BY display_order
+                ''', (product_id,))
+                
+                features = []
+                for row in cursor.fetchall():
+                    features.append({
+                        'text': row['feature_text'],
+                        'type': row['feature_type'],
+                        'order': row['display_order']
+                    })
+                
+                # Get specifications
+                cursor.execute('''
+                    SELECT spec_name, spec_value, spec_unit, display_order
+                    FROM product_specifications
+                    WHERE product_id = ?
+                    ORDER BY display_order
+                ''', (product_id,))
+                
+                specifications = []
+                for row in cursor.fetchall():
+                    specifications.append({
+                        'name': row['spec_name'],
+                        'value': row['spec_value'],
+                        'unit': row['spec_unit'],
+                        'order': row['display_order']
+                    })
+                
+                # Get categories
+                cursor.execute('''
+                    SELECT category_name, is_primary, display_order
+                    FROM product_categories
+                    WHERE product_id = ?
+                    ORDER BY display_order
+                ''', (product_id,))
+                
+                categories = []
+                for row in cursor.fetchall():
+                    categories.append({
+                        'name': row['category_name'],
+                        'is_primary': row['is_primary'],
+                        'order': row['display_order']
+                    })
+                
+                product['features'] = features
+                product['specifications'] = specifications
+                product['categories'] = categories
+                
+                return product
+                
+        except Exception as e:
+            print(f"❌ Error getting product data for ID {product_id}: {e}")
+            return None
+    
+    def extract_key_benefits(self, product: Dict[str, Any]) -> List[str]:
+        """Extract key benefits from product data"""
+        
+        benefits = []
+        
+        # From features (pros)
+        for feature in product.get('features', []):
+            if feature['type'] == 'pro':
+                text = feature['text'].lower()
+                
+                # Check for quality indicators
+                for keyword in self.quality_keywords:
+                    if keyword in text:
+                        benefits.append(feature['text'])
+                        break
+                
+                # Check for material benefits
+                for keyword in self.material_keywords:
+                    if keyword in text:
+                        benefits.append(feature['text'])
+                        break
+                
+                # Check for feature benefits
+                for keyword in self.feature_keywords:
+                    if keyword in text:
+                        benefits.append(feature['text'])
+                        break
+        
+        # From title and description
+        title = product.get('title', '').lower()
+        description = product.get('description', '').lower()
+        
+        # Check for thread count
+        for keyword in self.thread_count_keywords:
+            if keyword in title or keyword in description:
+                # Extract thread count
+                thread_match = re.search(r'(\d+)\s*(?:thread|tc)', title + ' ' + description)
+                if thread_match:
+                    thread_count = thread_match.group(1)
+                    benefits.append(f"{thread_count}-thread count for durability")
+                break
+        
+        # Check for material in title
+        for material in self.material_keywords:
+            if material in title:
+                benefits.append(f"Made from {material}")
+                break
+        
+        return benefits[:3]  # Limit to top 3 benefits
+    
+    def extract_key_concerns(self, product: Dict[str, Any]) -> List[str]:
+        """Extract key concerns or considerations from product data"""
+        
+        concerns = []
+        
+        # From features (cons)
+        for feature in product.get('features', []):
+            if feature['type'] == 'con':
+                text = feature['text'].lower()
+                
+                # Check for concern keywords
+                for keyword in self.concern_keywords:
+                    if keyword in text:
+                        concerns.append(feature['text'])
+                        break
+        
+        # From description
+        description = product.get('description', '').lower()
+        
+        # Check for specific concerns
+        if 'warm' in description or 'hot' in description:
+            concerns.append("may be too warm for hot sleepers")
+        elif 'cool' in description or 'cooling' in description:
+            concerns.append("may be too cool for cold sleepers")
+        
+        return concerns[:2]  # Limit to top 2 concerns
+    
+    def generate_summary(self, product: Dict[str, Any]) -> str:
+        """Generate a concise one-sentence product summary using all available data"""
+        
+        title = product.get('title', '')
+        price = product.get('price')
+        rating = product.get('rating')
+        review_count = product.get('review_count')
+        brand = product.get('brand', '')
+        description = product.get('description', '')
+        
+        # Use newly extracted fields if available, otherwise fall back to extraction
+        material = product.get('material') or self._extract_material(title, description)
+        color = product.get('color') or 'Unknown'
+        size = product.get('size') or self._extract_size(title)
+        key_feature = self._extract_key_feature(title, description)
+        thread_count = self._extract_thread_count(title, description)
+        
+        # Build summary components
+        summary_parts = []
+        
+        # Start with material and key feature
+        if material and material != 'Unknown':
+            if key_feature:
+                summary_parts.append(f"{material} {key_feature}")
+            else:
+                summary_parts.append(f"{material} sheets")
+        elif key_feature:
+            summary_parts.append(f"{key_feature} sheets")
+        else:
+            summary_parts.append("quality sheets")
+        
+        # Add color if available and not Unknown
+        if color and color != 'Unknown':
+            summary_parts.append(f"in {color}")
+        
+        # Add thread count if available
+        if thread_count:
+            summary_parts.append(f"with {thread_count}-thread count")
+        
+        # Add size if available and not Unknown
+        if size and size != 'Unknown':
+            summary_parts.append(f"in {size} size")
+        
+        # Add value/quality indicator
+        value_indicator = self._get_value_indicator(price, rating, review_count)
+        if value_indicator:
+            summary_parts.append(value_indicator)
+        
+        # Add brand if notable
+        if brand and brand not in ['Unknown', 'Visit the', ''] and len(brand) < 30:
+            summary_parts.append(f"by {brand}")
+        
+        # Add main concern if any
+        concerns = self.extract_key_concerns(product)
+        if concerns:
+            concern = concerns[0].replace('may be too ', '').replace(' for ', ' for ')
+            summary_parts.append(f"but may not suit {concern}")
+        
+        # Join parts into a sentence
+        if len(summary_parts) == 1:
+            summary = summary_parts[0]
+        elif len(summary_parts) == 2:
+            summary = f"{summary_parts[0]} {summary_parts[1]}"
+        elif len(summary_parts) == 3:
+            summary = f"{summary_parts[0]} {summary_parts[1]} {summary_parts[2]}"
+        else:
+            # For more than 3 parts, prioritize the most important ones
+            summary = f"{summary_parts[0]} {summary_parts[1]}"
+            if len(summary_parts) > 2:
+                summary += f" {summary_parts[2]}"
+        
+        # Ensure it's a complete sentence
+        if not summary.endswith('.'):
+            summary += '.'
+        
+        # Capitalize first letter
+        summary = summary[0].upper() + summary[1:]
+        
+        # Limit length to reasonable size
+        if len(summary) > 200:
+            summary = summary[:197] + '...'
+        
+        return summary
+    
+    def _extract_material(self, title: str, description: str) -> str:
+        """Extract material from title and description"""
+        text = (title + ' ' + description).lower()
+        
+        materials = {
+            'egyptian cotton': 'Egyptian cotton',
+            'organic cotton': 'organic cotton',
+            '100% cotton': 'cotton',
+            'cotton': 'cotton',
+            'bamboo': 'bamboo',
+            'linen': 'linen',
+            'silk': 'silk',
+            'microfiber': 'microfiber',
+            'polyester': 'polyester',
+            'tencel': 'Tencel',
+            'eucalyptus': 'eucalyptus'
+        }
+        
+        for keyword, material in materials.items():
+            if keyword in text:
+                return material
+        
+        return None
+    
+    def _extract_key_feature(self, title: str, description: str) -> str:
+        """Extract key feature from title and description"""
+        text = (title + ' ' + description).lower()
+        
+        features = {
+            'cooling': 'cooling',
+            'breathable': 'breathable',
+            'moisture-wicking': 'moisture-wicking',
+            'wrinkle-free': 'wrinkle-free',
+            'hypoallergenic': 'hypoallergenic',
+            'anti-microbial': 'anti-microbial',
+            'temperature regulating': 'temperature-regulating',
+            'luxury': 'luxury',
+            'premium': 'premium'
+        }
+        
+        for keyword, feature in features.items():
+            if keyword in text:
+                return feature
+        
+        return None
+    
+    def _extract_thread_count(self, title: str, description: str) -> str:
+        """Extract thread count from title and description"""
+        text = (title + ' ' + description).lower()
+        
+        import re
+        thread_match = re.search(r'(\d+)\s*(?:thread|tc)', text)
+        if thread_match:
+            return thread_match.group(1)
+        
+        return None
+    
+    def _extract_size(self, title: str) -> str:
+        """Extract size from title"""
+        text = title.lower()
+        
+        sizes = ['twin', 'twin xl', 'full', 'queen', 'king', 'california king']
+        for size in sizes:
+            if size in text:
+                return size.replace(' xl', ' XL').replace('california king', 'California King').title()
+        
+        return None
+    
+    def _get_value_indicator(self, price: float, rating: float, review_count: int) -> str:
+        """Get value/quality indicator based on price, rating, and reviews"""
+        if not rating or not review_count:
+            return None
+        
+        # High rating with many reviews
+        if rating >= 4.5 and review_count >= 1000:
+            return "with excellent reviews"
+        elif rating >= 4.0 and review_count >= 500:
+            return "with great reviews"
+        elif rating >= 3.5 and review_count >= 100:
+            return "with good reviews"
+        
+        # Price-based indicators
+        if price:
+            if price < 30:
+                return "at an affordable price"
+            elif price < 60:
+                return "at a mid-range price"
+            elif price >= 100:
+                return "at a premium price"
+        
+        return None
+    
+    def update_product_summary(self, product_id: int, summary: str) -> bool:
+        """Update product summary in database"""
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    UPDATE products 
+                    SET product_summary = ?, updated_at = datetime('now')
+                    WHERE id = ?
+                ''', (summary, product_id))
+                
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            print(f"❌ Error updating summary for product {product_id}: {e}")
+            return False
+    
+    def generate_all_summaries(self) -> Dict[str, Any]:
+        """Generate summaries for all products"""
+        
+        print("🚀 Starting product summary generation...")
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get all product IDs
+                cursor.execute('SELECT id, title FROM products WHERE is_active = TRUE ORDER BY id')
+                products = cursor.fetchall()
+                
+                results = {
+                    'total_products': len(products),
+                    'successful_summaries': 0,
+                    'failed_summaries': 0,
+                    'summaries': []
+                }
+                
+                print(f"📊 Found {len(products)} products to process")
+                
+                for product_id, title in products:
+                    print(f"\n📝 Processing: {title[:50]}...")
+                    
+                    # Get product data
+                    product_data = self.get_product_data(product_id)
+                    if not product_data:
+                        print(f"   ❌ Could not get product data")
+                        results['failed_summaries'] += 1
+                        continue
+                    
+                    # Generate summary
+                    summary = self.generate_summary(product_data)
+                    print(f"   📋 Summary: {summary}")
+                    
+                    # Update database
+                    if self.update_product_summary(product_id, summary):
+                        print(f"   ✅ Updated database")
+                        results['successful_summaries'] += 1
+                        results['summaries'].append({
+                            'product_id': product_id,
+                            'title': title,
+                            'summary': summary
+                        })
+                    else:
+                        print(f"   ❌ Failed to update database")
+                        results['failed_summaries'] += 1
+                
+                return results
+                
+        except Exception as e:
+            print(f"❌ Error generating summaries: {e}")
+            return {'error': str(e)}
+    
+    def print_summary(self, results: Dict[str, Any]):
+        """Print generation summary"""
+        
+        if 'error' in results:
+            print(f"❌ Error: {results['error']}")
+            return
+        
+        print(f"\n🎉 Product Summary Generation Complete!")
+        print(f"📊 Summary:")
+        print(f"   Total products: {results['total_products']}")
+        print(f"   Successful summaries: {results['successful_summaries']}")
+        print(f"   Failed summaries: {results['failed_summaries']}")
+        print(f"   Success rate: {(results['successful_summaries']/results['total_products']*100):.1f}%")
+        
+        print(f"\n📋 Sample Summaries:")
+        for summary_data in results['summaries'][:5]:  # Show first 5
+            print(f"   {summary_data['product_id']}: {summary_data['summary']}")
+        
+        if len(results['summaries']) > 5:
+            print(f"   ... and {len(results['summaries']) - 5} more summaries")
+
+def main():
+    """Main function"""
+    
+    print("🚀 Product Summary Generator")
+    print("Generating one-sentence summaries for all products")
+    print("=" * 60)
+    
+    generator = ProductSummaryGenerator()
+    
+    # Generate all summaries
+    results = generator.generate_all_summaries()
+    
+    # Print summary
+    generator.print_summary(results)
+
+if __name__ == "__main__":
+    main()
