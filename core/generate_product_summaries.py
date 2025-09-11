@@ -249,35 +249,114 @@ class ProductSummaryGenerator:
         if brand and brand not in ['Unknown', 'Visit the', ''] and len(brand) < 30:
             summary_parts.append(f"by {brand}")
         
-        # Add main concern if any
-        concerns = self.extract_key_concerns(product)
-        if concerns:
-            concern = concerns[0].replace('may be too ', '').replace(' for ', ' for ')
-            summary_parts.append(f"but may not suit {concern}")
+        # Generate Martha Stewart-style summary
+        martha_summary = self._generate_martha_stewart_summary(
+            material, key_feature, color, thread_count, size, 
+            price, rating, review_count, brand
+        )
         
-        # Join parts into a sentence
-        if len(summary_parts) == 1:
-            summary = summary_parts[0]
-        elif len(summary_parts) == 2:
-            summary = f"{summary_parts[0]} {summary_parts[1]}"
-        elif len(summary_parts) == 3:
-            summary = f"{summary_parts[0]} {summary_parts[1]} {summary_parts[2]}"
-        else:
-            # For more than 3 parts, prioritize the most important ones
-            summary = f"{summary_parts[0]} {summary_parts[1]}"
-            if len(summary_parts) > 2:
-                summary += f" {summary_parts[2]}"
+        return martha_summary
+    
+    def _generate_martha_stewart_summary(self, material, key_feature, color, thread_count, size, 
+                                       price, rating, review_count, brand) -> str:
+        """Generate a Martha Stewart-style elegant summary"""
         
-        # Ensure it's a complete sentence
+        # Martha's signature phrases and style elements
+        martha_openings = [
+            "A simply divine",
+            "An absolutely exquisite",
+            "A perfectly elegant",
+            "A beautifully crafted",
+            "A wonderfully luxurious",
+            "A delightfully soft",
+            "A truly exceptional",
+            "A magnificently designed"
+        ]
+        
+        martha_materials = {
+            'cotton': 'premium cotton',
+            'egyptian cotton': 'fine Egyptian cotton',
+            'organic cotton': 'organic cotton',
+            'bamboo': 'silky bamboo',
+            'linen': 'crisp linen',
+            'silk': 'lustrous silk',
+            'microfiber': 'ultra-soft microfiber'
+        }
+        
+        martha_features = {
+            'cooling': 'temperature-regulating',
+            'breathable': 'beautifully breathable',
+            'moisture-wicking': 'moisture-wicking',
+            'wrinkle-free': 'wrinkle-resistant',
+            'luxury': 'luxuriously soft',
+            'premium': 'premium quality'
+        }
+        
+        martha_endings = [
+            "that will transform your bedroom into a sanctuary of comfort.",
+            "perfect for creating that magazine-worthy bedroom aesthetic.",
+            "that brings both style and substance to your home.",
+            "ideal for those who appreciate the finer things in life.",
+            "that elevates your sleep experience to new heights.",
+            "perfect for the discerning homeowner who values quality.",
+            "that combines timeless elegance with modern comfort.",
+            "ideal for creating a sophisticated bedroom retreat."
+        ]
+        
+        # Build the Martha-style summary
+        import random
+        
+        # Choose opening
+        opening = random.choice(martha_openings)
+        
+        # Material description
+        material_desc = martha_materials.get(material.lower(), material.lower()) if material else "premium"
+        
+        # Feature description
+        feature_desc = martha_features.get(key_feature.lower(), key_feature.lower()) if key_feature else "bedding"
+        
+        # Size description
+        size_desc = f" in {size}" if size and size != 'Unknown' else ""
+        
+        # Thread count
+        thread_desc = f" with a luxurious {thread_count}-thread count" if thread_count else ""
+        
+        # Color
+        color_desc = f" in a lovely {color}" if color and color != 'Unknown' else ""
+        
+        # Brand mention
+        brand_desc = f" from {brand}" if brand and brand not in ['Unknown', 'Visit the', ''] and len(brand) < 30 else ""
+        
+        # Quality indicator based on rating
+        quality_desc = ""
+        if rating and rating >= 4.5:
+            quality_desc = " with outstanding reviews"
+        elif rating and rating >= 4.0:
+            quality_desc = " with excellent reviews"
+        
+        # Choose ending
+        ending = random.choice(martha_endings)
+        
+        # Construct the summary
+        summary_parts = [
+            opening,
+            material_desc,
+            feature_desc,
+            size_desc,
+            thread_desc,
+            color_desc,
+            brand_desc,
+            quality_desc,
+            ending
+        ]
+        
+        # Join and clean up
+        summary = " ".join([part for part in summary_parts if part])
+        
+        # Ensure proper capitalization and punctuation
+        summary = summary[0].upper() + summary[1:]
         if not summary.endswith('.'):
             summary += '.'
-        
-        # Capitalize first letter
-        summary = summary[0].upper() + summary[1:]
-        
-        # Limit length to reasonable size
-        if len(summary) > 200:
-            summary = summary[:197] + '...'
         
         return summary
     

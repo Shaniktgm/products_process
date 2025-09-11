@@ -332,8 +332,245 @@ class EnhancedAutomatedPipeline:
         
         print("\n" + "="*80)
     
+    def process_affiliate_links_file(self, file_path: str = "products/product_affilate_links.csv") -> Dict[str, Any]:
+        """
+        Process affiliate links CSV file and import basic product data
+        
+        Args:
+            file_path: Path to affiliate links CSV file
+        
+        Returns:
+            Dict with processing results
+        """
+        print("🔗 Processing Affiliate Links File")
+        print("=" * 50)
+        print(f"📁 File: {file_path}")
+        print("=" * 50)
+        
+        results = {
+            'total_links': 0,
+            'products_created': 0,
+            'products_updated': 0,
+            'affiliate_links_added': 0,
+            'errors': []
+        }
+        
+        try:
+            import csv
+            from urllib.parse import urlparse, parse_qs
+            
+            with open(file_path, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                results['total_links'] = sum(1 for row in reader)
+                file.seek(0)
+                reader = csv.DictReader(file)
+                
+                for row_num, row in enumerate(reader, 1):
+                    try:
+                        # Extract data from CSV row (matching actual CSV format)
+                        platform_name = row.get('platform', 'amazon associates')
+                        affiliate_url = row.get('referral link', '')  # Note: column name is 'referral link'
+                        brand = row.get('brand', '')
+                        price = float(row.get('price', 0)) if row.get('price') else 0.0
+                        # Handle commission rate (might be percentage like "15%" or number like "15")
+                        commission_str = row.get('commission', '0')
+                        if commission_str:
+                            # Remove % sign if present and convert to decimal
+                            commission_str = commission_str.replace('%', '')
+                            commission_rate = float(commission_str) / 100.0 if commission_str else 0.0
+                        else:
+                            commission_rate = 0.0
+                        end_date = row.get('End date', '')  # Note: column name is 'End date'
+                        affiliate_page_internal_link = row.get('affilate_page_internal_link', '')  # Note: typo in original CSV
+                        
+                        # Extract Amazon product ID from URL
+                        amazon_product_id = self._extract_amazon_product_id(affiliate_url)
+                        if not amazon_product_id:
+                            print(f"   ⚠️  Row {row_num}: No Amazon product ID found in URL")
+                            continue
+                        
+                        print(f"   [{row_num}] Processing: {amazon_product_id} - {brand}")
+                        
+                        # Get or create platform
+                        platform_id = self._get_or_create_platform(platform_name)
+                        
+                        # Get or create product
+                        product_id = self._get_or_create_product_from_affiliate(
+                            amazon_product_id, brand, price, platform_id
+                        )
+                        
+                        if product_id:
+                            # Create or update affiliate link
+                            affiliate_link_id = self._create_or_update_affiliate_link(
+                                product_id, platform_id, affiliate_url, commission_rate, 
+                                end_date, affiliate_page_internal_link
+                            )
+                            
+                            if affiliate_link_id:
+                                results['affiliate_links_added'] += 1
+                                print(f"      ✅ Affiliate link added")
+                            else:
+                                print(f"      ⚠️  Failed to add affiliate link")
+                        
+                    except Exception as e:
+                        error_msg = f"Row {row_num}: {str(e)}"
+                        results['errors'].append(error_msg)
+                        print(f"   ❌ {error_msg}")
+            
+            print(f"\n✅ Affiliate Links Processing Complete!")
+            print(f"   Total Links: {results['total_links']}")
+            print(f"   Products Created: {results['products_created']}")
+            print(f"   Products Updated: {results['products_updated']}")
+            print(f"   Affiliate Links Added: {results['affiliate_links_added']}")
+            print(f"   Errors: {len(results['errors'])}")
+            
+        except Exception as e:
+            error_msg = f"Failed to process affiliate links file: {str(e)}"
+            results['errors'].append(error_msg)
+            print(f"❌ {error_msg}")
+        
+        return results
+
+    def _extract_amazon_product_id(self, url: str) -> Optional[str]:
+        """Extract Amazon product ID from URL"""
+        import re
+        # Try different Amazon URL patterns
+        patterns = [
+            r'/dp/([A-Z0-9]{10})',
+            r'/product/([A-Z0-9]{10})',
+            r'/gp/product/([A-Z0-9]{10})',
+            r'/([A-Z0-9]{10})/'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        return None
+
+    def _get_or_create_platform(self, platform_name: str) -> int:
+        """Get or create platform and return platform ID"""
+        import sqlite3
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Check if platform exists
+            cursor.execute("SELECT id FROM platforms WHERE name = ?", (platform_name,))
+            result = cursor.fetchone()
+            
+            if result:
+                return result[0]
+            
+            # Create new platform
+            cursor.execute("""
+                INSERT INTO platforms (name, display_name, base_url)
+                VALUES (?, ?, ?)
+            """, (platform_name, platform_name, "https://amazon.com"))
+            
+            return cursor.lastrowid
+
+    def _get_or_create_product_from_affiliate(self, amazon_product_id: str, brand: str, 
+                                            price: float, platform_id: int) -> Optional[int]:
+        """Get or create product from affiliate data"""
+        import sqlite3
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Check if product exists
+            cursor.execute("SELECT id FROM products WHERE amazon_product_id = ?", (amazon_product_id,))
+            result = cursor.fetchone()
+            
+            if result:
+                return result[0]
+            
+            # Create new product
+            sku = f"AMZ-{amazon_product_id}"
+            title = f"{brand} Product {amazon_product_id}"
+            
+            cursor.execute("""
+                INSERT INTO products (sku, title, brand, price, amazon_product_id, platform_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (sku, title, brand, price, amazon_product_id, platform_id))
+            
+            return cursor.lastrowid
+
+    def _create_or_update_affiliate_link(self, product_id: int, platform_id: int, 
+                                       affiliate_url: str, commission_rate: float,
+                                       end_date: str, affiliate_page_internal_link: str) -> Optional[int]:
+        """Create or update affiliate link"""
+        import sqlite3
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Generate pretty referral link
+            pretty_referral_link = self._generate_pretty_referral_link(affiliate_url)
+            
+            # Check if affiliate link exists
+            cursor.execute("""
+                SELECT id FROM affiliation_details 
+                WHERE product_id = ? AND platform_id = ?
+            """, (product_id, platform_id))
+            
+            result = cursor.fetchone()
+            
+            if result:
+                # Update existing
+                cursor.execute("""
+                    UPDATE affiliation_details SET
+                        affiliate_url = ?,
+                        commission_rate = ?,
+                        end_date = ?,
+                        affiliate_page_internal_link = ?,
+                        pretty_referral_link = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (affiliate_url, commission_rate, end_date, 
+                     affiliate_page_internal_link, pretty_referral_link, result[0]))
+                return result[0]
+            else:
+                # Create new
+                cursor.execute("""
+                    INSERT INTO affiliation_details 
+                    (product_id, platform_id, affiliate_url, commission_rate, 
+                     end_date, affiliate_page_internal_link, pretty_referral_link)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (product_id, platform_id, affiliate_url, commission_rate,
+                     end_date, affiliate_page_internal_link, pretty_referral_link))
+                return cursor.lastrowid
+
+    def _generate_pretty_referral_link(self, affiliate_url: str) -> str:
+        """Generate a pretty referral link with homeprinciple tag"""
+        import re
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        
+        # Extract Amazon product ID
+        amazon_id = self._extract_amazon_product_id(affiliate_url)
+        if not amazon_id:
+            return affiliate_url
+        
+        # Create clean Amazon URL
+        clean_url = f"https://www.amazon.com/dp/{amazon_id}"
+        
+        # Add homeprinciple tag
+        params = {'tag': 'homeprinciple-20'}
+        
+        # Parse URL and add parameters
+        parsed = urlparse(clean_url)
+        query_params = parse_qs(parsed.query)
+        query_params.update(params)
+        
+        # Rebuild URL
+        new_query = urlencode(query_params, doseq=True)
+        pretty_url = urlunparse((
+            parsed.scheme, parsed.netloc, parsed.path,
+            parsed.params, new_query, parsed.fragment
+        ))
+        
+        return pretty_url
+
     def process_url_file_enhanced(self, file_path: str, file_format: str = "csv", 
-                                 upload_to_vercel: bool = True) -> Dict[str, Any]:
+                                 upload_to_vercel: bool = True, 
+                                 process_affiliate_links: bool = False) -> Dict[str, Any]:
         """
         Enhanced main entry point: Process a file containing product URLs with full pipeline
         
@@ -341,6 +578,7 @@ class EnhancedAutomatedPipeline:
             file_path: Path to file containing URLs
             file_format: "csv" or "txt" or "json"
             upload_to_vercel: Whether to upload images to Vercel
+            process_affiliate_links: Whether to first process affiliate links CSV
         
         Returns:
             Dict with processing results
@@ -351,7 +589,17 @@ class EnhancedAutomatedPipeline:
         print(f"📁 Processing file: {file_path}")
         print(f"📋 Format: {file_format}")
         print(f"☁️  Vercel upload: {'Yes' if upload_to_vercel else 'No'}")
+        print(f"🔗 Process affiliate links: {'Yes' if process_affiliate_links else 'No'}")
         print("=" * 60)
+        
+        # Step 0: Process affiliate links if requested
+        affiliate_results = {}
+        if process_affiliate_links:
+            print("\n🔗 STEP 0: Processing Affiliate Links")
+            print("-" * 40)
+            affiliate_results = self.process_affiliate_links_file()
+            print(f"✅ Affiliate links processed: {affiliate_results.get('affiliate_links_added', 0)} links added")
+            print("-" * 40)
         
         results = {
             'total_urls': 0,
@@ -360,6 +608,7 @@ class EnhancedAutomatedPipeline:
             'duplicates': 0,
             'products_added': [],
             'summaries_generated': 0,
+            'affiliate_links_processed': affiliate_results.get('affiliate_links_added', 0),
             'enhanced_pros_cons': 0,
             'images_uploaded': 0,
             'vercel_urls_updated': 0,
@@ -850,7 +1099,7 @@ class EnhancedAutomatedPipeline:
                 return validation_result
             
             # Extract product ID
-        asin_match = re.search(r'/dp/([A-Z0-9]{10})', url)
+            asin_match = re.search(r'/dp/([A-Z0-9]{10})', url)
             if not asin_match:
                 validation_result['reason'] = 'No valid Amazon product ID found'
                 return validation_result
@@ -2304,6 +2553,7 @@ def main():
     
     print("🚀 Enhanced Automated Product Pipeline Ready!")
     print("Features:")
+    print("  ✅ Process affiliate links CSV files")
     print("  ✅ Extract product data from URLs")
     print("  ✅ Save images locally")
     print("  ✅ Generate product summaries")
@@ -2312,7 +2562,10 @@ def main():
     print("  ✅ Update database with Vercel URLs")
     print("  ✅ Calculate product scores")
     print("\nUsage:")
-    print("  results = pipeline.process_url_file_enhanced('your_file.csv', 'csv')")
+    print("  # Process affiliate links + extract product details:")
+    print("  results = pipeline.process_url_file_enhanced('products/product_affilate_links.csv', 'csv', process_affiliate_links=True)")
+    print("  # Or just process affiliate links:")
+    print("  results = pipeline.process_affiliate_links_file('products/product_affilate_links.csv')")
     
     if not vercel_token:
         print("\n⚠️  VERCEL_TOKEN not set - Vercel upload will be skipped")
