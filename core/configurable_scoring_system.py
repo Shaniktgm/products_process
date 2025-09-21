@@ -19,7 +19,7 @@ class ConfigurableScoringSystem:
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from JSON file"""
         try:
-            with open(self.config_file, 'r') as f:
+            with open(self.config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             print(f"✅ Loaded scoring configuration from {self.config_file}")
             return config
@@ -38,9 +38,9 @@ class ConfigurableScoringSystem:
                 "formula": "price"
             },
             "sub_scores": {
-                "total_score": {"fallback_method": "rating_based"},
-                "popularity_score": {"fallback_method": "review_count_based"},
-                "brand_reputation_score": {"fallback_method": "rating_based"},
+                "popularity_score": {"fallback_method": "review_count_simplified"},
+                "brand_reputation_score": {"fallback_method": "rating_as_is"},
+                "price_value_score": {"fallback_method": "price_commission_value"},
                 "overall_value_score": {"fallback_method": "price_rating_ratio"},
                 "luxury_score": {"fallback_method": "price_based"}
             }
@@ -66,34 +66,9 @@ class ConfigurableScoringSystem:
             # Default to comprehensive_composite
             return self._calculate_comprehensive_composite_score(product_data)
     
-    def _calculate_overall_value_score(self, product_data: Dict[str, Any]) -> float:
-        """Calculate overall_value_score (value for money)"""
-        # Always calculate the score using the fallback method
-        return self._calculate_fallback_score("overall_value_score", "price_rating_ratio", product_data)
-    
-    def _calculate_price_based_score(self, product_data: Dict[str, Any]) -> float:
-        """Calculate score based on price"""
-        price = product_data.get('price', 0)
-        return float(price) if price else 0.0
-    
-    def _calculate_weighted_composite_score(self, product_data: Dict[str, Any]) -> float:
-        """Calculate weighted composite score using only popularity_score and brand_reputation_score"""
-        weights = self.config.get("scoring_weights", {})
-        
-        # Calculate sub-scores if not available
-        sub_scores = self.calculate_sub_scores(product_data)
-        popularity_score = sub_scores.get('popularity_score', 0)
-        brand_reputation_score = sub_scores.get('brand_reputation_score', 0)
-        
-        weighted_score = (
-            popularity_score * weights.get('popularity_score', 0.4) +
-            brand_reputation_score * weights.get('brand_reputation_score', 0.6)
-        )
-        
-        return round(weighted_score, 2)
     
     def _calculate_comprehensive_composite_score(self, product_data: Dict[str, Any]) -> float:
-        """Calculate comprehensive composite score using popularity, brand reputation, price value, and commission"""
+        """Calculate comprehensive composite score using popularity, brand reputation, and price value"""
         weights = self.config.get("scoring_weights", {})
         
         # Calculate sub-scores if not available
@@ -101,64 +76,22 @@ class ConfigurableScoringSystem:
         popularity_score = sub_scores.get('popularity_score', 0)
         brand_reputation_score = sub_scores.get('brand_reputation_score', 0)
         price_value_score = sub_scores.get('price_value_score', 0)
-        commission_score = sub_scores.get('commission_score', 0)
         
         weighted_score = (
-            popularity_score * weights.get('popularity_score', 0.3) +
-            brand_reputation_score * weights.get('brand_reputation_score', 0.3) +
-            price_value_score * weights.get('price_value_score', 0.2) +
-            commission_score * weights.get('commission_score', 0.2)
+            popularity_score * weights.get('popularity_score', 0.2) +
+            brand_reputation_score * weights.get('brand_reputation_score', 0.2) +
+            price_value_score * weights.get('price_value_score', 0.6)
         )
         
         return round(weighted_score, 2)
     
-    def _calculate_value_focused_score(self, product_data: Dict[str, Any], price_range: tuple = None) -> float:
-        """Calculate value-focused score with normalized price (scores 3-5)"""
-        rating = product_data.get('rating', 0) or 0
-        price = product_data.get('price', 0) or 0
-        
-        if rating == 0 or price == 0:
-            return 3.0  # Minimum score
-        
-        # Use provided price range or default range
-        if price_range:
-            min_price, max_price = price_range
-        else:
-            # Default range if not provided
-            min_price = 50
-            max_price = 500
-        
-        # Normalize price to 0-1 range
-        if max_price == min_price:
-            normalized_price = 0.5  # Avoid division by zero
-        else:
-            normalized_price = min(1.0, max(0.0, (price - min_price) / (max_price - min_price)))
-        
-        # Calculate score: 3 + (rating * normalized_price) * 2
-        # This ensures scores are between 3 and 5
-        value_score = 3 + (rating * normalized_price) * 2
-        return round(min(value_score, 5.0), 2)  # Cap at 5
-    
-    def _calculate_luxury_premium_score(self, product_data: Dict[str, Any]) -> float:
-        """Calculate luxury-focused score"""
-        luxury_score = product_data.get('luxury_score', 0) or 0
-        brand_reputation_score = product_data.get('brand_reputation_score', 0) or 0
-        total_score = product_data.get('total_score', 0) or 0
-        
-        luxury_premium_score = (
-            luxury_score * 2 + 
-            brand_reputation_score * 1.5 + 
-            total_score
-        )
-        
-        return round(min(luxury_premium_score, 30), 2)  # Cap at 30
     
     def calculate_sub_scores(self, product_data: Dict[str, Any]) -> Dict[str, float]:
-        """Calculate sub-scores based on configuration (popularity, brand reputation, price value, commission)"""
+        """Calculate sub-scores based on configuration (popularity, brand reputation, price value)"""
         sub_scores = {}
         
-        # Calculate all 4 required sub-scores
-        required_scores = ["popularity_score", "brand_reputation_score", "price_value_score", "commission_score"]
+        # Calculate all 3 required sub-scores
+        required_scores = ["popularity_score", "brand_reputation_score", "price_value_score"]
         
         for score_name in required_scores:
             if score_name in self.config.get("sub_scores", {}):
@@ -191,6 +124,14 @@ class ConfigurableScoringSystem:
             else:
                 return 2.5
         
+        elif method == "rating_as_is":
+            rating = product_data.get('rating')
+            # Use rating as-is, fallback to 2 if no rating
+            if rating is not None and rating != '' and rating != 0:
+                return float(rating)
+            else:
+                return 2.0
+        
         elif method == "review_count_based":
             review_count = product_data.get('review_count', 0) or 0
             thresholds = self.config.get("review_count_thresholds", {})
@@ -206,6 +147,17 @@ class ConfigurableScoringSystem:
             else:
                 return 2.5
         
+        elif method == "review_count_simplified":
+            review_count = product_data.get('review_count', 0) or 0
+            
+            # Simplified thresholds: >1000=5, >500=4, <500=3
+            if review_count > 1000:
+                return 5.0
+            elif review_count > 500:
+                return 4.0
+            else:
+                return 3.0
+        
         elif method == "price_rating_ratio":
             rating = product_data.get('rating', 0) or 0
             price = product_data.get('price', 0) or 0
@@ -218,6 +170,25 @@ class ConfigurableScoringSystem:
                 return 4.0
             else:
                 return 3.0
+        
+        elif method == "price_commission_value":
+            # Get price and commission rate
+            price = product_data.get('price', 0) or 0
+            commission_rate = product_data.get('commission_rate', 0.10) or 0.10  # Default 10%
+            
+            # Calculate price × commission rate (earnings per sale)
+            earnings_per_sale = price * commission_rate
+            
+            if earnings_per_sale > 20:
+                return 5.0
+            elif earnings_per_sale > 15:
+                return 4.0
+            elif earnings_per_sale > 10:
+                return 3.0
+            elif earnings_per_sale > 5:
+                return 2.0
+            else:
+                return 1.0
         
         elif method == "price_based":
             price = product_data.get('price', 0) or 0
@@ -232,18 +203,6 @@ class ConfigurableScoringSystem:
             else:
                 return 2.5
         
-        elif method == "commission_based":
-            # Get commission rate from product data or use default
-            commission_rate = product_data.get('commission_rate', 0.10)  # Default 10%
-            
-            if commission_rate >= 0.15:
-                return 5.0
-            elif commission_rate >= 0.10:
-                return 4.5
-            elif commission_rate >= 0.05:
-                return 4.0
-            else:
-                return 3.0
         
         else:
             return 3.5  # Default score (middle of 2-5 range)
@@ -278,13 +237,18 @@ class ConfigurableScoringSystem:
                 # No price range needed for overall_value_score method
                 price_range = None
                 
-                # Get all products
-                cursor.execute("SELECT * FROM products")
+                # Get all products with commission rates
+                cursor.execute("""
+                    SELECT p.*, ad.commission_rate
+                    FROM products p
+                    LEFT JOIN affiliation_details ad ON p.id = ad.product_id
+                """)
                 products = cursor.fetchall()
                 
                 # Get column names
                 cursor.execute("PRAGMA table_info(products)")
-                columns = [col[1] for col in cursor.fetchall()]
+                product_columns = [col[1] for col in cursor.fetchall()]
+                columns = product_columns + ['commission_rate']
                 
                 updated_count = 0
                 
@@ -301,13 +265,12 @@ class ConfigurableScoringSystem:
                         cursor.execute("""
                             UPDATE products 
                             SET overall_score = ?, popularity_score = ?, brand_reputation_score = ?, 
-                                price_value_score = ?, commission_score = ?
+                                price_value_score = ?
                             WHERE id = ?
                         """, (new_overall_score, 
                               sub_scores.get('popularity_score', 0), 
                               sub_scores.get('brand_reputation_score', 0),
                               sub_scores.get('price_value_score', 0),
-                              sub_scores.get('commission_score', 0),
                               product_data['id']))
                         
                         updated_count += 1

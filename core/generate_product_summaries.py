@@ -63,10 +63,10 @@ class ProductSummaryGenerator:
                 
                 # Get features (pros/cons)
                 cursor.execute('''
-                    SELECT feature_text, feature_type, display_order
-                    FROM product_features
+                    SELECT feature_text, feature_type, id
+                    FROM smart_product_features
                     WHERE product_id = ?
-                    ORDER BY display_order
+                    ORDER BY id
                 ''', (product_id,))
                 
                 features = []
@@ -74,40 +74,54 @@ class ProductSummaryGenerator:
                     features.append({
                         'text': row['feature_text'],
                         'type': row['feature_type'],
-                        'order': row['display_order']
+                        'order': row['id']
                     })
                 
-                # Get specifications
-                cursor.execute('''
-                    SELECT spec_name, spec_value, spec_unit, display_order
-                    FROM product_specifications
-                    WHERE product_id = ?
-                    ORDER BY display_order
-                ''', (product_id,))
-                
+                # Get specifications (from products table since product_specifications doesn't exist)
                 specifications = []
-                for row in cursor.fetchall():
+                if product.get('thread_count'):
                     specifications.append({
-                        'name': row['spec_name'],
-                        'value': row['spec_value'],
-                        'unit': row['spec_unit'],
-                        'order': row['display_order']
+                        'name': 'Thread Count',
+                        'value': str(product['thread_count']),
+                        'unit': 'TC',
+                        'order': 1
+                    })
+                if product.get('weave_type'):
+                    specifications.append({
+                        'name': 'Weave Type',
+                        'value': product['weave_type'],
+                        'unit': '',
+                        'order': 2
+                    })
+                if product.get('material'):
+                    specifications.append({
+                        'name': 'Material',
+                        'value': product['material'],
+                        'unit': '',
+                        'order': 3
+                    })
+                if product.get('size'):
+                    specifications.append({
+                        'name': 'Size',
+                        'value': product['size'],
+                        'unit': '',
+                        'order': 4
                     })
                 
                 # Get categories
                 cursor.execute('''
-                    SELECT category_name, is_primary, display_order
+                    SELECT category_name, is_primary
                     FROM product_categories
                     WHERE product_id = ?
-                    ORDER BY display_order
+                    ORDER BY is_primary DESC, category_name
                 ''', (product_id,))
                 
                 categories = []
-                for row in cursor.fetchall():
+                for i, row in enumerate(cursor.fetchall()):
                     categories.append({
                         'name': row['category_name'],
                         'is_primary': row['is_primary'],
-                        'order': row['display_order']
+                        'order': i
                     })
                 
                 product['features'] = features
@@ -200,62 +214,85 @@ class ProductSummaryGenerator:
     def generate_summary(self, product: Dict[str, Any]) -> str:
         """Generate a concise one-sentence product summary using all available data"""
         
-        title = product.get('title', '')
-        price = product.get('price')
-        rating = product.get('rating')
-        review_count = product.get('review_count')
-        brand = product.get('brand', '')
-        description = product.get('description', '')
-        
-        # Use newly extracted fields if available, otherwise fall back to extraction
-        material = product.get('material') or self._extract_material(title, description)
-        color = product.get('color') or 'Unknown'
-        size = product.get('size') or self._extract_size(title)
-        key_feature = self._extract_key_feature(title, description)
-        thread_count = self._extract_thread_count(title, description)
-        
-        # Build summary components
-        summary_parts = []
-        
-        # Start with material and key feature
-        if material and material != 'Unknown':
-            if key_feature:
-                summary_parts.append(f"{material} {key_feature}")
+        try:
+            title = product.get('title', '')
+            price = product.get('price')
+            rating = product.get('rating')
+            review_count = product.get('review_count')
+            brand = product.get('brand', '')
+            description = product.get('description', '')
+            
+            # Use newly extracted fields if available, otherwise fall back to extraction
+            material = product.get('material') or self._extract_material(title, description)
+            color = product.get('color') or 'Unknown'
+            size = product.get('size') or self._extract_size(title)
+            key_feature = self._extract_key_feature(title, description)
+            thread_count = self._extract_thread_count(title, description)
+            
+            # Build summary components
+            summary_parts = []
+            
+            # Start with material and key feature
+            if material and material != 'Unknown':
+                if key_feature:
+                    summary_parts.append(f"{material} {key_feature}")
+                else:
+                    summary_parts.append(f"{material} sheets")
+            elif key_feature:
+                summary_parts.append(f"{key_feature} sheets")
             else:
-                summary_parts.append(f"{material} sheets")
-        elif key_feature:
-            summary_parts.append(f"{key_feature} sheets")
-        else:
-            summary_parts.append("quality sheets")
-        
-        # Add color if available and not Unknown
-        if color and color != 'Unknown':
-            summary_parts.append(f"in {color}")
-        
-        # Add thread count if available
-        if thread_count:
-            summary_parts.append(f"with {thread_count}-thread count")
-        
-        # Add size if available and not Unknown
-        if size and size != 'Unknown':
-            summary_parts.append(f"in {size} size")
-        
-        # Add value/quality indicator
-        value_indicator = self._get_value_indicator(price, rating, review_count)
-        if value_indicator:
-            summary_parts.append(value_indicator)
-        
-        # Add brand if notable
-        if brand and brand not in ['Unknown', 'Visit the', ''] and len(brand) < 30:
-            summary_parts.append(f"by {brand}")
-        
-        # Generate Martha Stewart-style summary
-        martha_summary = self._generate_martha_stewart_summary(
-            material, key_feature, color, thread_count, size, 
-            price, rating, review_count, brand
-        )
-        
-        return martha_summary
+                summary_parts.append("quality sheets")
+            
+            # Add color if available and not Unknown
+            if color and color != 'Unknown':
+                summary_parts.append(f"in {color}")
+            
+            # Add thread count if available
+            if thread_count:
+                summary_parts.append(f"with {thread_count}-thread count")
+            
+            # Add size if available and not Unknown
+            if size and size != 'Unknown':
+                summary_parts.append(f"in {size} size")
+            
+            # Add value/quality indicator
+            value_indicator = self._get_value_indicator(price, rating, review_count)
+            if value_indicator:
+                summary_parts.append(value_indicator)
+            
+            # Add brand if notable
+            if brand and brand not in ['Unknown', 'Visit the', ''] and len(brand) < 30:
+                summary_parts.append(f"by {brand}")
+            
+            # Generate Martha Stewart-style summary
+            # Ensure all parameters are not None before passing
+            martha_summary = self._generate_martha_stewart_summary(
+                material or 'Unknown', 
+                key_feature or 'Unknown', 
+                color or 'Unknown', 
+                thread_count or 0, 
+                size or 'Unknown', 
+                price or 0, 
+                rating or 0, 
+                review_count or 0, 
+                brand or 'Unknown'
+            )
+            
+            return martha_summary
+            
+        except Exception as e:
+            # Fallback summary for products with insufficient data
+            print(f"⚠️ Error generating summary for product {product.get('id', 'unknown')}: {e}")
+            # Clean up the title to remove product IDs/ASINs
+            title = product.get('title', 'product')
+            # Remove common product ID patterns
+            import re
+            title = re.sub(r'\b[A-Z0-9]{10}\b', '', title)  # Remove ASINs like B0CZ7KBRPT
+            title = re.sub(r'\bAmazon Product\b', '', title)  # Remove "Amazon Product"
+            title = title.strip()
+            if not title:
+                title = "bedding product"
+            return f"A quality {title} perfect for your home."
     
     def _generate_martha_stewart_summary(self, material, key_feature, color, thread_count, size, 
                                        price, rating, review_count, brand) -> str:
@@ -310,22 +347,22 @@ class ProductSummaryGenerator:
         opening = random.choice(martha_openings)
         
         # Material description
-        material_desc = martha_materials.get(material.lower(), material.lower()) if material else "premium"
+        material_desc = martha_materials.get(material.lower(), material.lower()) if material and material != 'Unknown' else "premium"
         
         # Feature description
-        feature_desc = martha_features.get(key_feature.lower(), key_feature.lower()) if key_feature else "bedding"
+        feature_desc = martha_features.get(key_feature.lower(), key_feature.lower()) if key_feature and key_feature != 'Unknown' else "bedding"
         
         # Size description
         size_desc = f" in {size}" if size and size != 'Unknown' else ""
         
         # Thread count
-        thread_desc = f" with a luxurious {thread_count}-thread count" if thread_count else ""
+        thread_desc = f" with a luxurious {thread_count}-thread count" if thread_count and thread_count != 'Unknown' else ""
         
         # Color
         color_desc = f" in a lovely {color}" if color and color != 'Unknown' else ""
         
         # Brand mention
-        brand_desc = f" from {brand}" if brand and brand not in ['Unknown', 'Visit the', ''] and len(brand) < 30 else ""
+        brand_desc = f" {brand}" if brand and brand not in ['Unknown', 'Visit the', ''] and len(brand) < 30 else ""
         
         # Quality indicator based on rating
         quality_desc = ""
@@ -337,26 +374,46 @@ class ProductSummaryGenerator:
         # Choose ending
         ending = random.choice(martha_endings)
         
-        # Construct the summary
-        summary_parts = [
-            opening,
-            material_desc,
-            feature_desc,
-            size_desc,
-            thread_desc,
-            color_desc,
-            brand_desc,
-            quality_desc,
-            ending
-        ]
+        # Construct the summary with proper punctuation
+        # First sentence: Opening + material + feature + size + thread count
+        first_sentence_parts = [opening, material_desc, feature_desc]
+        if size_desc:
+            first_sentence_parts.append(size_desc.strip())
+        if thread_desc:
+            first_sentence_parts.append(thread_desc.strip())
         
-        # Join and clean up
-        summary = " ".join([part for part in summary_parts if part])
+        # Filter out None values and ensure all parts are strings
+        first_sentence_parts = [str(part) for part in first_sentence_parts if part is not None and str(part).strip()]
+        first_sentence = " ".join(first_sentence_parts)
+        if first_sentence:
+            first_sentence = first_sentence[0].upper() + first_sentence[1:] + "."
+        else:
+            first_sentence = "A premium bedding product."
         
-        # Ensure proper capitalization and punctuation
-        summary = summary[0].upper() + summary[1:]
-        if not summary.endswith('.'):
-            summary += '.'
+        # Second sentence: Color + brand + quality + ending
+        second_sentence_parts = []
+        if color_desc:
+            second_sentence_parts.append(f"Available{color_desc}")
+        if brand_desc:
+            second_sentence_parts.append(f"from{brand_desc}")
+        if quality_desc:
+            second_sentence_parts.append(quality_desc.strip())
+        
+        # Add ending
+        second_sentence_parts.append(ending)
+        
+        # Filter out None values and ensure all parts are strings
+        second_sentence_parts = [str(part) for part in second_sentence_parts if part is not None and str(part).strip()]
+        second_sentence = " ".join(second_sentence_parts)
+        if second_sentence:
+            second_sentence = second_sentence[0].upper() + second_sentence[1:]
+            if not second_sentence.endswith('.'):
+                second_sentence += '.'
+        else:
+            second_sentence = "Perfect for your home."
+        
+        # Combine sentences
+        summary = first_sentence + " " + second_sentence
         
         return summary
     

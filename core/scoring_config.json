@@ -6,65 +6,53 @@
   },
   "overall_score": {
     "method": "comprehensive_composite",
-    "description": "Comprehensive score based on popularity, brand reputation, price, and commission",
+    "description": "Comprehensive score based on popularity, brand reputation, and price value",
     "formula": "comprehensive_composite",
     "options": {
       "comprehensive_composite": {
-        "description": "Weighted combination of popularity, brand reputation, price value, and commission",
-        "formula": "popularity_score * 0.3 + brand_reputation_score * 0.3 + price_value_score * 0.2 + commission_score * 0.2",
+        "description": "Weighted combination of popularity, brand reputation, and price value",
+        "formula": "popularity_score * 0.2 + brand_reputation_score * 0.2 + price_value_score * 0.6",
         "min_score": 2,
-        "max_score": 5,
-        "default_commission_rate": 0.1
+        "max_score": 5
       }
     }
   },
   "sub_scores": {
     "popularity_score": {
-      "description": "Product popularity based on review count",
+      "description": "Product popularity based on review count - simplified thresholds",
       "source": "csv_data",
-      "fallback_method": "review_count_based",
-      "fallback_formula": "min(5, 2 + (review_count / 1000))",
-      "min_value": 2,
+      "fallback_method": "review_count_simplified",
+      "fallback_formula": "review_count > 1000 ? 5 : review_count > 500 ? 4 : 3",
+      "min_value": 3,
       "max_value": 5,
       "thresholds": {
-        "very_popular": 5000,
-        "popular": 2000,
-        "moderate": 1000,
-        "low": 500
+        "high": 1000,
+        "medium": 500,
+        "low": 0
       }
     },
     "brand_reputation_score": {
-      "description": "Brand trust and reputation score",
+      "description": "Brand reputation score - uses rating as-is, fallback to 2 if no rating",
       "source": "csv_data",
-      "fallback_method": "rating_based",
-      "fallback_formula": "rating >= 4.5 ? 5 : rating >= 4.0 ? 4.5 : rating >= 3.5 ? 3.5 : 2.5",
+      "fallback_method": "rating_as_is",
+      "fallback_formula": "rating ? rating : 2",
       "min_value": 2,
       "max_value": 5
     },
     "price_value_score": {
-      "description": "Price value assessment based on price and rating",
+      "description": "Price value assessment based on price × commission rate (earnings per sale)",
       "source": "csv_data",
-      "fallback_method": "price_rating_ratio",
-      "fallback_formula": "rating >= 4.0 && price < 100 ? 5 : rating >= 4.0 && price < 150 ? 4.5 : rating >= 3.5 && price < 200 ? 4 : 3",
-      "min_value": 2,
+      "fallback_method": "price_commission_value",
+      "fallback_formula": "price * commission_rate > 20 ? 5 : price * commission_rate > 15 ? 4 : price * commission_rate > 10 ? 3 : price * commission_rate > 5 ? 2 : 1",
+      "min_value": 1,
       "max_value": 5
-    },
-    "commission_score": {
-      "description": "Commission value score based on commission rate and price",
-      "source": "csv_data",
-      "fallback_method": "commission_based",
-      "fallback_formula": "commission_rate >= 0.15 ? 5 : commission_rate >= 0.10 ? 4.5 : commission_rate >= 0.05 ? 4 : 3",
-      "min_value": 2,
-      "max_value": 5,
-      "default_commission_rate": 0.1
     }
   },
   "scoring_weights": {
     "description": "Weights for comprehensive composite scoring method",
-    "popularity_score": 0.3,
-    "brand_reputation_score": 0.3,
-    "price_value_score": 0.2,
-    "commission_score": 0.2
+    "popularity_score": 0.2,
+    "brand_reputation_score": 0.2,
+    "price_value_score": 0.6
   },
   "price_categories": {
     "description": "Price ranges for different product tiers",
