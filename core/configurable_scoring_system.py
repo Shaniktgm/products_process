@@ -68,7 +68,7 @@ class ConfigurableScoringSystem:
     
     
     def _calculate_comprehensive_composite_score(self, product_data: Dict[str, Any]) -> float:
-        """Calculate comprehensive composite score using popularity, brand reputation, and price value"""
+        """Calculate comprehensive composite score using popularity, brand reputation, price value, and discount"""
         weights = self.config.get("scoring_weights", {})
         
         # Calculate sub-scores if not available
@@ -76,22 +76,24 @@ class ConfigurableScoringSystem:
         popularity_score = sub_scores.get('popularity_score', 0)
         brand_reputation_score = sub_scores.get('brand_reputation_score', 0)
         price_value_score = sub_scores.get('price_value_score', 0)
+        discount_score = sub_scores.get('discount_score', 0)
         
         weighted_score = (
-            popularity_score * weights.get('popularity_score', 0.2) +
-            brand_reputation_score * weights.get('brand_reputation_score', 0.2) +
-            price_value_score * weights.get('price_value_score', 0.6)
+            popularity_score * weights.get('popularity_score', 0.15) +
+            brand_reputation_score * weights.get('brand_reputation_score', 0.15) +
+            price_value_score * weights.get('price_value_score', 0.50) +
+            discount_score * weights.get('discount_score', 0.20)
         )
         
         return round(weighted_score, 2)
     
     
     def calculate_sub_scores(self, product_data: Dict[str, Any]) -> Dict[str, float]:
-        """Calculate sub-scores based on configuration (popularity, brand reputation, price value)"""
+        """Calculate sub-scores based on configuration (popularity, brand reputation, price value, discount)"""
         sub_scores = {}
         
-        # Calculate all 3 required sub-scores
-        required_scores = ["popularity_score", "brand_reputation_score", "price_value_score"]
+        # Calculate all required sub-scores
+        required_scores = ["popularity_score", "brand_reputation_score", "price_value_score", "discount_score"]
         
         for score_name in required_scores:
             if score_name in self.config.get("sub_scores", {}):
@@ -190,6 +192,19 @@ class ConfigurableScoringSystem:
             else:
                 return 1.0
         
+        elif method == "discount_score":
+            # Get discount from affiliation_details
+            discount = product_data.get('discount', 0) or 0
+            
+            if discount > 20:
+                return 5.0
+            elif discount >= 10:
+                return 4.0
+            elif discount >= 5:
+                return 3.0
+            else:
+                return 2.0
+        
         elif method == "price_based":
             price = product_data.get('price', 0) or 0
             thresholds = self.config.get("price_categories", {})
@@ -237,9 +252,9 @@ class ConfigurableScoringSystem:
                 # No price range needed for overall_value_score method
                 price_range = None
                 
-                # Get all products with commission rates
+                # Get all products with commission rates and discount
                 cursor.execute("""
-                    SELECT p.*, ad.commission_rate
+                    SELECT p.*, ad.commission_rate, ad.discount
                     FROM products p
                     LEFT JOIN affiliation_details ad ON p.id = ad.product_id
                 """)
@@ -248,7 +263,7 @@ class ConfigurableScoringSystem:
                 # Get column names
                 cursor.execute("PRAGMA table_info(products)")
                 product_columns = [col[1] for col in cursor.fetchall()]
-                columns = product_columns + ['commission_rate']
+                columns = product_columns + ['commission_rate', 'discount']
                 
                 updated_count = 0
                 
@@ -265,12 +280,13 @@ class ConfigurableScoringSystem:
                         cursor.execute("""
                             UPDATE products 
                             SET overall_score = ?, popularity_score = ?, brand_reputation_score = ?, 
-                                price_value_score = ?
+                                price_value_score = ?, discount_score = ?
                             WHERE id = ?
                         """, (new_overall_score, 
                               sub_scores.get('popularity_score', 0), 
                               sub_scores.get('brand_reputation_score', 0),
                               sub_scores.get('price_value_score', 0),
+                              sub_scores.get('discount_score', 0),
                               product_data['id']))
                         
                         updated_count += 1

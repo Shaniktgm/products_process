@@ -17,6 +17,9 @@ test_*.json
 .env.local
 .env.production
 
+# Amazon API credentials (NEVER commit these!)
+amazon_api_local_config.py
+
 # Python cache
 __pycache__/
 *.py[cod]

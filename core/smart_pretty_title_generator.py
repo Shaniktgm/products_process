@@ -34,14 +34,19 @@ class SmartPrettyTitleGenerator:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
-            # Get all products with their data
+            # Get all products with their data (prefer Amazon API title/brand when available)
             cursor.execute('''
                 SELECT 
-                    p.id, p.title, p.description, p.product_summary,
-                    p.material, p.weave_type, p.thread_count, p.color, p.size, p.brand,
-                    p.price, p.rating
+                    p.id,
+                    COALESCE(NULLIF(p.amazon_title, ''), p.title) as source_title,
+                    p.description, p.product_summary,
+                    p.material, p.weave_type, p.thread_count, p.color, p.size,
+                    COALESCE(NULLIF(p.amazon_brand, ''), p.brand) as source_brand,
+                    p.price, p.rating,
+                    p.amazon_asin
                 FROM products p
-                WHERE p.title IS NOT NULL AND p.title != ''
+                WHERE COALESCE(NULLIF(p.amazon_title, ''), p.title) IS NOT NULL
+                  AND COALESCE(NULLIF(p.amazon_title, ''), p.title) != ''
                 ORDER BY p.id
             ''')
             
@@ -51,7 +56,7 @@ class SmartPrettyTitleGenerator:
             for product in products:
                 try:
                     product_id = product[0]
-                    title = product[1]
+                    raw_title = product[1] or ''
                     description = product[2] or ''
                     summary = product[3] or ''
                     material = product[4] or ''
@@ -62,6 +67,10 @@ class SmartPrettyTitleGenerator:
                     brand = product[9] or ''
                     price = product[10]
                     rating = product[11]
+                    asin = product[12] or ''
+
+                    # Clean generic placeholders from titles like "Amazon Product" and ASIN tokens
+                    title = self._clean_generic_title(raw_title, asin)
                     
                     # Generate smart pretty title
                     pretty_title = self._generate_smart_pretty_title(
@@ -167,6 +176,24 @@ class SmartPrettyTitleGenerator:
             pretty_title = ' '.join(fallback_words[:8])
         
         return pretty_title
+
+    def _clean_generic_title(self, title: str, asin: str) -> str:
+        """Remove generic placeholders like 'Amazon Product' and ASIN tokens from titles."""
+        if not title:
+            return ''
+        cleaned = title.strip()
+        # Remove leading generic label
+        if cleaned.lower().startswith('amazon product'):
+            cleaned = cleaned[len('amazon product'):].strip('-: _')
+        # Remove ASIN occurrences
+        import re
+        asin_pat = asin if asin else ''
+        cleaned = re.sub(r"\b[A-Z0-9]{10}\b", "", cleaned).strip()
+        if asin_pat:
+            cleaned = cleaned.replace(asin_pat, '').strip()
+        # Collapse spaces
+        cleaned = re.sub(r"\s{2,}", " ", cleaned)
+        return cleaned or 'Product'
     
     def _clean_brand_name(self, brand: str) -> str:
         """Clean and standardize brand name"""

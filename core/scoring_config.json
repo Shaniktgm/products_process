@@ -10,8 +10,8 @@
     "formula": "comprehensive_composite",
     "options": {
       "comprehensive_composite": {
-        "description": "Weighted combination of popularity, brand reputation, and price value",
-        "formula": "popularity_score * 0.2 + brand_reputation_score * 0.2 + price_value_score * 0.6",
+        "description": "Weighted combination of popularity, brand reputation, price value, and discount",
+        "formula": "popularity_score * 0.15 + brand_reputation_score * 0.15 + price_value_score * 0.50 + discount_score * 0.20",
         "min_score": 2,
         "max_score": 5
       }
@@ -46,13 +46,28 @@
       "fallback_formula": "price * commission_rate > 20 ? 5 : price * commission_rate > 15 ? 4 : price * commission_rate > 10 ? 3 : price * commission_rate > 5 ? 2 : 1",
       "min_value": 1,
       "max_value": 5
+    },
+    "discount_score": {
+      "description": "Discount value score based on discount percentage",
+      "source": "affiliation_data",
+      "fallback_method": "discount_score",
+      "fallback_formula": "discount > 20 ? 5 : discount > 10 ? 4 : discount > 5 ? 3 : 2",
+      "min_value": 2,
+      "max_value": 5,
+      "thresholds": {
+        "excellent": 20,
+        "good": 10,
+        "fair": 5,
+        "minimal": 0
+      }
     }
   },
   "scoring_weights": {
     "description": "Weights for comprehensive composite scoring method",
-    "popularity_score": 0.2,
-    "brand_reputation_score": 0.2,
-    "price_value_score": 0.6
+    "popularity_score": 0.15,
+    "brand_reputation_score": 0.15,
+    "price_value_score": 0.50,
+    "discount_score": 0.20
   },
   "price_categories": {
     "description": "Price ranges for different product tiers",

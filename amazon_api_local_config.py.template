@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""
+Amazon API Local Configuration
+Copy this file and add your actual credentials
+DO NOT commit this file to git!
+"""
+
+AMAZON_API_CONFIG = {
+    'access_key': 'YOUR_ACCESS_KEY_HERE',
+    'secret_key': 'YOUR_SECRET_KEY_HERE', 
+    'associate_tag': 'YOUR_ASSOCIATE_TAG_HERE',
+}

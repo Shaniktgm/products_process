@@ -122,8 +122,31 @@ class DataCollectionPipeline:
             print(f"❌ Error converting affiliate URL {affiliate_url}: {e}")
             return None
     
+    def _update_product_price_discount(self, cursor, product_id: int, discount: Optional[float], start_date: Optional[datetime]) -> None:
+        """Update only price and discount for existing product"""
+        try:
+            # Update affiliation_details with new discount and start_date
+            cursor.execute("""
+                UPDATE affiliation_details 
+                SET discount = ?, start_date = ?, updated_at = ?
+                WHERE product_id = ? AND platform_id = 8
+            """, (discount, start_date, datetime.now(), product_id))
+            
+            # Update products table updated_at timestamp
+            cursor.execute("""
+                UPDATE products 
+                SET updated_at = ?
+                WHERE id = ?
+            """, (datetime.now(), product_id))
+            
+            print(f"   ✅ Updated price/discount for product {product_id}")
+            
+        except Exception as e:
+            print(f"   ❌ Error updating product {product_id}: {e}")
+            raise
+    
     def process_affiliate_links_file(self, csv_file_path: str) -> Dict[str, int]:
-        """Process CSV file with affiliate links"""
+        """Process CSV file with affiliate links with smart 48-hour logic"""
         print(f"📋 Processing affiliate links from: {csv_file_path}")
         
         if not os.path.exists(csv_file_path):
@@ -188,24 +211,41 @@ class DataCollectionPipeline:
                             self.stats['errors'] += 1
                             continue
                         
-                        # Check if product already exists
-                        cursor.execute("SELECT id FROM products WHERE amazon_product_id = ?", (product_id,))
+                        # Check if product already exists and get last update time
+                        cursor.execute("""
+                            SELECT id, updated_at FROM products 
+                            WHERE amazon_product_id = ?
+                        """, (product_id,))
                         existing_product = cursor.fetchone()
                         
                         if existing_product:
-                            # Add affiliate link to existing product
-                            cursor.execute("""
-                                INSERT OR IGNORE INTO affiliation_details 
-                                (product_id, platform_id, affiliate_url, link_type, discount, start_date)
-                                VALUES (?, 8, ?, 'web', ?, ?)
-                            """, (existing_product[0], affiliate_url, discount, start_date))
-                            self.stats['skipped'] += 1
+                            product_db_id, last_updated = existing_product
+                            
+                            # Check if updated within last 48 hours
+                            if last_updated:
+                                last_updated_dt = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
+                                time_diff = datetime.now() - last_updated_dt.replace(tzinfo=None)
+                                
+                                if time_diff.total_seconds() < 48 * 3600:  # 48 hours in seconds
+                                    print(f"⏭️ Product {product_id} updated {time_diff.total_seconds()/3600:.1f}h ago - skipping")
+                                    self.stats['skipped'] += 1
+                                    continue
+                            
+                            # Product exists but not updated recently - update only price/discount
+                            print(f"🔄 Updating price/discount for existing product {product_id}")
+                            self._update_product_price_discount(cursor, product_db_id, discount, start_date)
+                            self.stats['products_updated'] += 1
                         else:
+                            # New product - create and process fully
+                            print(f"🆕 Creating new product {product_id}")
+                            sku = f"AMZ-{product_id}"
+                            title = f"Amazon Product {product_id}"
+                            
                             # Create new product
                             cursor.execute("""
-                                INSERT INTO products (amazon_product_id, created_at, updated_at)
-                                VALUES (?, ?, ?)
-                            """, (product_id, datetime.now(), datetime.now()))
+                                INSERT INTO products (sku, title, amazon_product_id, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, ?)
+                            """, (sku, title, product_id, datetime.now(), datetime.now()))
                             
                             new_product_id = cursor.lastrowid
                             
@@ -416,6 +456,7 @@ class DataCollectionPipeline:
         affiliate_results = self.process_affiliate_links_file(affiliate_csv_path)
         print(f"✅ Processed {affiliate_results['processed']} affiliate links")
         print(f"   📊 Created {affiliate_results['products_created']} new products")
+        print(f"   🔄 Updated {affiliate_results['products_updated']} existing products")
         print(f"   📊 Skipped {affiliate_results['skipped']} existing products")
         print(f"   ❌ Errors: {affiliate_results['errors']}")
         
