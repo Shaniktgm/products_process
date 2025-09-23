@@ -15,6 +15,7 @@ from core.generate_product_summaries import ProductSummaryGenerator
 from core.smart_pros_cons_generator import SmartProsConsGenerator
 from core.enhanced_amazon_pros_cons_generator import EnhancedAmazonProsConsGenerator
 from core.smart_pretty_title_generator import SmartPrettyTitleGenerator
+from improved_pretty_title_generator import ImprovedPrettyTitleGenerator
 from core.material_extractor import MaterialExtractor
 from core.weave_extractor import WeaveExtractor
 from core.configurable_scoring_system import ConfigurableScoringSystem
@@ -34,6 +35,7 @@ class ContentGenerationPipeline:
         self.smart_pros_cons = SmartProsConsGenerator(db_path)
         self.enhanced_amazon_pros_cons = EnhancedAmazonProsConsGenerator(db_path)
         self.smart_pretty_titles = SmartPrettyTitleGenerator(db_path)
+        self.improved_pretty_titles = ImprovedPrettyTitleGenerator(db_path)
         self.material_extractor = MaterialExtractor(db_path)
         self.weave_extractor = WeaveExtractor(db_path)
         self.field_extractor = ProductDataExtractor(db_path)
@@ -132,7 +134,7 @@ class ContentGenerationPipeline:
         try:
             sf_results = self._generate_structured_features_from_amazon()
             inserted = sf_results.get('features_inserted', 0)
-            print(f"✅ Inserted {inserted} structured features into smart_product_features")
+            print(f"✅ Inserted {inserted} structured features into smart_features")
             # Track as part of features generated for visibility
             self.stats['pros_cons_generated'] += inserted
         except Exception as e:
@@ -141,12 +143,12 @@ class ContentGenerationPipeline:
             traceback.print_exc()
             self.stats['errors'] += 1
         
-        # Step 3: Generate smart pretty titles
-        print("\n🎨 Step 3: Generating Smart Pretty Titles")
+        # Step 3: Generate improved pretty titles (under 10 words)
+        print("\n🎨 Step 3: Generating Improved Pretty Titles (Under 10 Words)")
         try:
-            pretty_title_results = self.smart_pretty_titles.generate_all_pretty_titles()
+            pretty_title_results = self.improved_pretty_titles.update_all_pretty_titles()
             self.stats['pretty_titles_generated'] = pretty_title_results.get('titles_generated', 0)
-            print(f"✅ Generated smart pretty titles for {self.stats['pretty_titles_generated']} products")
+            print(f"✅ Generated improved pretty titles for {self.stats['pretty_titles_generated']} products")
         except Exception as e:
             print(f"❌ Error generating pretty titles: {e}")
             import traceback
@@ -252,7 +254,7 @@ class ContentGenerationPipeline:
             conn.close()
 
     def _generate_structured_features_from_amazon(self) -> Dict[str, Any]:
-        """Parse amazon_features.feature_text into normalized smart_product_features rows.
+        """Parse smart_features.feature_text from amazon_raw source into structured features.
         Creates info/pro features with categories like certification, material, weave, thread_count,
         set_specs, fit, care, comfort, sustainability, award.
         Avoids duplicates per (product_id, feature_text).
@@ -267,16 +269,16 @@ class ContentGenerationPipeline:
         try:
             cursor.execute(
                 """
-                SELECT af.product_id, af.feature_text
-                FROM amazon_features af
-                JOIN products p ON p.id = af.product_id
-                WHERE TRIM(af.feature_text) != ''
+                SELECT sf.product_id, sf.feature_text
+                FROM smart_features sf
+                JOIN products p ON p.id = sf.product_id
+                WHERE TRIM(sf.feature_text) != '' AND sf.source_type = 'amazon_raw'
                 """
             )
             rows = cursor.fetchall()
             
             # Existing to prevent duplicates
-            cursor.execute("SELECT product_id, feature_text FROM smart_product_features")
+            cursor.execute("SELECT product_id, feature_text FROM smart_features WHERE source_type = 'structured_extraction'")
             existing = set(cursor.fetchall())
             
             # Regex helpers
@@ -311,11 +313,11 @@ class ContentGenerationPipeline:
                     return
                 cursor.execute(
                     """
-                    INSERT INTO smart_product_features
-                    (product_id, feature_text, feature_type, category, importance, explanation, impact_score, product_specific, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+                    INSERT INTO smart_features
+                    (product_id, feature_text, feature_type, enhanced_feature_type, category, importance, explanation, impact_score, product_specific, source_type, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'structured_extraction', ?)
                     """,
-                    (pid, text, ftype, category, importance, explanation or '', impact, datetime.now().isoformat())
+                    (pid, text, ftype, 'info', category, importance, explanation or '', impact, datetime.now().isoformat())
                 )
                 existing.add(key)
                 features_inserted += 1
@@ -411,7 +413,7 @@ class ContentGenerationPipeline:
             conn.close()
 
     def _enrich_brands_from_features(self) -> Dict[str, Any]:
-        """Parse amazon_features and amazon_reviews to enrich brands table extended fields.
+        """Parse smart_features from amazon_raw source to enrich brands table extended fields.
         Fills: company_type, environmental_certifications, sustainability_practices, brand_story, customer_satisfaction_score.
         Only sets fields when currently NULL/empty.
         """
@@ -434,10 +436,10 @@ class ContentGenerationPipeline:
                 # Gather all feature texts for products under this brand
                 cursor.execute(
                     """
-                    SELECT af.feature_text
-                    FROM amazon_features af
-                    JOIN products p ON p.id = af.product_id
-                    WHERE p.brand_id = ?
+                    SELECT sf.feature_text
+                    FROM smart_features sf
+                    JOIN products p ON p.id = sf.product_id
+                    WHERE p.brand_id = ? AND sf.source_type = 'amazon_raw'
                     """,
                     (brand_id,)
                 )
@@ -490,20 +492,10 @@ class ContentGenerationPipeline:
                     if first_lines:
                         updates['brand_story'] = (" ".join(first_lines[:2]))[:500]
                 
-                # customer_satisfaction_score from reviews average if available
-                if csat is None:
-                    cursor.execute(
-                        """
-                        SELECT AVG(ar.star_rating)
-                        FROM amazon_reviews ar
-                        JOIN products p ON p.id = ar.product_id
-                        WHERE p.brand_id = ? AND ar.star_rating IS NOT NULL
-                        """,
-                        (brand_id,)
-                    )
-                    avg_rating = cursor.fetchone()[0]
-                    if avg_rating is not None:
-                        updates['customer_satisfaction_score'] = float(round(avg_rating, 2))
+                # customer_satisfaction_score from reviews average if available (disabled - amazon_reviews table removed)
+                # if csat is None:
+                #     # This functionality is disabled since amazon_reviews table was removed
+                #     pass
                 
                 if updates:
                     # Build dynamic update

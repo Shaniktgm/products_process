@@ -39,10 +39,9 @@ class SmartPrettyTitleGenerator:
                 SELECT 
                     p.id,
                     COALESCE(NULLIF(p.amazon_title, ''), p.title) as source_title,
-                    p.description, p.product_summary,
-                    p.material, p.weave_type, p.thread_count, p.color, p.size,
-                    COALESCE(NULLIF(p.amazon_brand, ''), p.brand) as source_brand,
-                    p.price, p.rating,
+                    p.product_summary,
+                    p.material, p.weave_type, p.thread_count,
+                    p.amazon_brand as source_brand,
                     p.amazon_asin
                 FROM products p
                 WHERE COALESCE(NULLIF(p.amazon_title, ''), p.title) IS NOT NULL
@@ -57,25 +56,20 @@ class SmartPrettyTitleGenerator:
                 try:
                     product_id = product[0]
                     raw_title = product[1] or ''
-                    description = product[2] or ''
-                    summary = product[3] or ''
-                    material = product[4] or ''
-                    weave_type = product[5] or ''
-                    thread_count = product[6]
-                    color = product[7] or ''
-                    size = product[8] or ''
-                    brand = product[9] or ''
-                    price = product[10]
-                    rating = product[11]
-                    asin = product[12] or ''
+                    summary = product[2] or ''
+                    material = product[3] or ''
+                    weave_type = product[4] or ''
+                    thread_count = product[5]
+                    brand = product[6] or ''
+                    asin = product[7] or ''
 
                     # Clean generic placeholders from titles like "Amazon Product" and ASIN tokens
                     title = self._clean_generic_title(raw_title, asin)
                     
                     # Generate smart pretty title
                     pretty_title = self._generate_smart_pretty_title(
-                        title, description, summary, material, weave_type, 
-                        thread_count, color, size, brand, price, rating
+                        title, '', summary, material, weave_type, 
+                        thread_count, 'white', 'queen', brand, 50.0, 4.5
                     )
                     
                     # Update database
@@ -103,7 +97,7 @@ class SmartPrettyTitleGenerator:
                                    material: str, weave_type: str, thread_count: int,
                                    color: str, size: str, brand: str, price: float, 
                                    rating: float) -> str:
-        """Generate a smart, concise pretty title (max 8 words) with fabric type, thread count, weave, and brand"""
+        """Generate a smart, concise pretty title (max 10 words) using the most relevant product information"""
         
         # Combine all text for analysis - prioritize description for fabric details
         combined_text = f"{description} {title} {summary}".lower()

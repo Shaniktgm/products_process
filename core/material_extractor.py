@@ -31,10 +31,9 @@ class MaterialExtractor:
                 SELECT 
                     p.id,
                     COALESCE(NULLIF(p.amazon_title, ''), p.title) as source_title,
-                    p.description,
-                    GROUP_CONCAT(af.feature_text, ' ') as amazon_features
+                    GROUP_CONCAT(sf.feature_text, ' ') as amazon_features
                 FROM products p
-                LEFT JOIN amazon_features af ON p.id = af.product_id
+                LEFT JOIN smart_features sf ON p.id = sf.product_id AND sf.source_type = 'amazon_raw'
                 WHERE COALESCE(NULLIF(p.amazon_title, ''), p.title) IS NOT NULL
                   AND COALESCE(NULLIF(p.amazon_title, ''), p.title) != ''
                 GROUP BY p.id
@@ -48,11 +47,10 @@ class MaterialExtractor:
                 try:
                     product_id = product[0]
                     title = product[1] or ''
-                    description = product[2] or ''
-                    amazon_features = product[3] or ''
+                    amazon_features = product[2] or ''
                     
                     # Extract material type
-                    material = self._extract_material_type(title, description, amazon_features)
+                    material = self._extract_material_type(title, '', amazon_features)
                     
                     # Update database
                     cursor.execute('''
@@ -120,18 +118,19 @@ class MaterialExtractor:
             cursor.execute('''
                 SELECT 
                     COALESCE(NULLIF(amazon_title, ''), title) as source_title,
-                    description,
-                    amazon_features
-                FROM products 
-                WHERE id = ?
+                    GROUP_CONCAT(sf.feature_text, ' ') as amazon_features
+                FROM products p
+                LEFT JOIN smart_features sf ON p.id = sf.product_id AND sf.source_type = 'amazon_raw'
+                WHERE p.id = ?
+                GROUP BY p.id
             ''', (product_id,))
             
             result = cursor.fetchone()
             if not result:
                 return None
             
-            title, description, amazon_features = result
-            return self._extract_material_type(title or '', description or '', amazon_features or '')
+            title, amazon_features = result
+            return self._extract_material_type(title or '', '', amazon_features or '')
 
 def main():
     """Main function"""

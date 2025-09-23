@@ -496,10 +496,10 @@ class AmazonAPIDataCollectionPipeline:
             
             for i, feature in enumerate(features):
                 cursor.execute("""
-                    INSERT OR REPLACE INTO amazon_features (
-                        product_id, feature_text, feature_type, display_order
-                    ) VALUES (?, ?, ?, ?)
-                """, (product_id, feature, 'bullet_point', i))
+                    INSERT OR REPLACE INTO smart_features (
+                        product_id, feature_text, feature_type, enhanced_feature_type, display_order, source_type
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                """, (product_id, feature, 'bullet_point', 'info', i, 'amazon_raw'))
                 
                 self.stats['features_added'] += 1
             

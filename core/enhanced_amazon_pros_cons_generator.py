@@ -130,11 +130,11 @@ class EnhancedAmazonProsConsGenerator:
             columns = [description[0] for description in cursor.description]
             product_dict = dict(zip(columns, product_data))
             
-            # Get Amazon features
+            # Get Amazon features from unified smart_features table
             cursor.execute("""
                 SELECT feature_text, feature_type, display_order
-                FROM amazon_features
-                WHERE product_id = ?
+                FROM smart_features
+                WHERE product_id = ? AND source_type = 'amazon_raw'
                 ORDER BY display_order
             """, (product_id,))
             
@@ -519,9 +519,9 @@ class EnhancedAmazonProsConsGenerator:
         """Analyze material and construction quality"""
         pros_cons = []
         
-        material_type = product_data.get('amazon_material_type', '').lower()
+        material_type = (product_data.get('amazon_material_type') or '').lower()
         thread_count = product_data.get('amazon_thread_count')
-        weave_type = product_data.get('amazon_weave_type', '').lower()
+        weave_type = (product_data.get('amazon_weave_type') or '').lower()
         
         # Analyze material quality
         if material_type:
@@ -716,8 +716,8 @@ class EnhancedAmazonProsConsGenerator:
         """Analyze how different features work together for synergistic benefits"""
         pros_cons = []
         
-        material_type = product_data.get('material', '').lower()
-        weave_type = product_data.get('weave_type', '').lower()
+        material_type = (product_data.get('material') or '').lower()
+        weave_type = (product_data.get('weave_type') or '').lower()
         thread_count = product_data.get('thread_count')
         
         # 9. FEATURE RELATIONSHIP UNDERSTANDING
@@ -822,25 +822,27 @@ class EnhancedAmazonProsConsGenerator:
         cursor = conn.cursor()
         
         try:
-            # Clear existing smart features for this product
-            cursor.execute("DELETE FROM smart_product_features WHERE product_id = ?", (product_id,))
+            # Clear existing processed features for this product (keep amazon_raw)
+            cursor.execute("DELETE FROM smart_features WHERE product_id = ? AND source_type = 'processed_pros_cons'", (product_id,))
             
             # Insert new enhanced features
             for feature in features:
                 cursor.execute("""
-                    INSERT INTO smart_product_features (
-                        product_id, feature_text, feature_type, category, 
-                        importance, explanation, impact_score, product_specific
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO smart_features (
+                        product_id, feature_text, feature_type, enhanced_feature_type, category, 
+                        importance, explanation, impact_score, product_specific, source_type
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     product_id,
                     feature.text,
                     'pro' if feature.impact_score > 0 else 'con',
+                    'pros' if feature.impact_score > 0 else 'cons',
                     feature.category.value,
                     feature.importance.value,
                     feature.explanation,
                     feature.impact_score,
-                    feature.product_specific
+                    feature.product_specific,
+                    'processed_pros_cons'
                 ))
             
             conn.commit()

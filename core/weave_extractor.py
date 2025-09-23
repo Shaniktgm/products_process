@@ -31,11 +31,10 @@ class WeaveExtractor:
                 SELECT 
                     p.id,
                     COALESCE(NULLIF(p.amazon_title, ''), p.title) as source_title,
-                    p.description,
-                    GROUP_CONCAT(af.feature_text, ' ') as amazon_features,
+                    GROUP_CONCAT(sf.feature_text, ' ') as amazon_features,
                     p.weave_type
                 FROM products p
-                LEFT JOIN amazon_features af ON p.id = af.product_id
+                LEFT JOIN smart_features sf ON p.id = sf.product_id AND sf.source_type = 'amazon_raw'
                 WHERE COALESCE(NULLIF(p.amazon_title, ''), p.title) IS NOT NULL
                   AND COALESCE(NULLIF(p.amazon_title, ''), p.title) != ''
                 GROUP BY p.id
@@ -49,9 +48,8 @@ class WeaveExtractor:
                 try:
                     product_id = product[0]
                     title = product[1] or ''
-                    description = product[2] or ''
-                    amazon_features = product[3] or ''
-                    existing_weave = product[4] or ''
+                    amazon_features = product[2] or ''
+                    existing_weave = product[3] or ''
                     
                     # Only extract if weave_type is empty or "None"
                     if existing_weave and existing_weave.lower() not in ['none', '']:
@@ -59,7 +57,7 @@ class WeaveExtractor:
                         continue
                     
                     # Extract weave type
-                    weave = self._extract_weave_type(title, description, amazon_features)
+                    weave = self._extract_weave_type(title, '', amazon_features)
                     
                     # Update database
                     cursor.execute('''
@@ -131,10 +129,9 @@ class WeaveExtractor:
             cursor.execute('''
                 SELECT 
                     COALESCE(NULLIF(amazon_title, ''), title) as source_title,
-                    description,
-                    GROUP_CONCAT(af.feature_text, ' ') as amazon_features
+                    GROUP_CONCAT(sf.feature_text, ' ') as amazon_features
                 FROM products p
-                LEFT JOIN amazon_features af ON p.id = af.product_id
+                LEFT JOIN smart_features sf ON p.id = sf.product_id AND sf.source_type = 'amazon_raw'
                 WHERE p.id = ?
                 GROUP BY p.id
             ''', (product_id,))
@@ -143,8 +140,8 @@ class WeaveExtractor:
             if not result:
                 return None
             
-            title, description, amazon_features = result
-            return self._extract_weave_type(title or '', description or '', amazon_features or '')
+            title, amazon_features = result
+            return self._extract_weave_type(title or '', '', amazon_features or '')
 
 def main():
     """Main function"""
